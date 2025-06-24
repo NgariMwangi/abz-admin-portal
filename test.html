@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+
+{% block title %}ABZ Hardware - Premium Tools & Equipment{% endblock %}
+
+{% block content %}
+<!-- Hero Section with Professional Design -->
+<section class="hero-section py-6" style="background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <div class="hero-content">
+                    <div class="badge mb-4" style="background: linear-gradient(45deg, #ffd700, #ffed4e); color: #1a1a1a; padding: 0.75rem 1.5rem; border-radius: 25px; font-weight: 600; font-size: 0.9rem; display: inline-block;">
+                        <i class="fas fa-star me-2"></i>Premium Hardware Store
+                    </div>
+                    
+                    <h1 class="display-4 fw-bold mb-4" style="line-height: 1.2; color: #1a1a1a;">
+                        <span style="color: #ffd700;">ABZ</span> Hardware Solutions
+                    </h1>
+                    
+                    <p class="lead mb-4" style="font-size: 1.25rem; color: #495057; line-height: 1.6; max-width: 90%;">
+                        Professional-grade tools, building materials, and equipment for contractors, builders, and serious DIY enthusiasts.
+                    </p>
+                    
+                    <div class="hero-stats d-flex gap-4 mb-5">
+                        <div class="stat-item text-center">
+                            <div class="stat-number fw-bold" style="color: #ffd700; font-size: 2rem;">1000+</div>
+                            <div class="stat-label" style="color: #6c757d; font-size: 0.9rem;">Premium Products</div>
+                        </div>
+                        <div class="stat-item text-center">
+                            <div class="stat-number fw-bold" style="color: #ffd700; font-size: 2rem;">5000+</div>
+                            <div class="stat-label" style="color: #6c757d; font-size: 0.9rem;">Satisfied Clients</div>
+                        </div>
+                    </div>
+                    
+                    <div class="hero-buttons d-flex gap-3 flex-wrap">
+                        <a href="{{ url_for('products') }}" class="btn btn-lg px-5 py-3 fw-bold" style="background: linear-gradient(45deg, #ffd700, #ffed4e); color: #1a1a1a; border: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.25);">
+                            <i class="fas fa-shopping-bag me-2"></i>Shop Products
+                        </a>
+                        <a href="#categories" class="btn btn-outline-dark btn-lg px-5 py-3 fw-bold" style="border: 2px solid #1a1a1a; color: #1a1a1a; border-radius: 8px;">
+                            <i class="fas fa-th-large me-2"></i>Browse Categories
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 text-center">
+                <div class="position-relative">
+                    <div class="position-absolute top-0 start-0 w-100 h-100" style="background: #f8f9fa; border-radius: 16px; z-index: 0;"></div>
+                    <div class="position-relative z-1">
+                        <img src="https://images.unsplash.com/photo-1581091226033-d5c48150dbaa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&h=600&q=80" 
+                             alt="Professional Tools" 
+                             class="img-fluid rounded-3 shadow" 
+                             style="border: 1px solid rgba(0,0,0,0.05);">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5" style="background: #f8f9fa;">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="feature-card text-center p-4 h-100" style="background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05);">
+                    <div class="feature-icon mb-4" style="width: 80px; height: 80px; margin: 0 auto; background: rgba(255, 215, 0, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-shipping-fast" style="font-size: 2rem; color: #ffd700;"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3" style="color: #1a1a1a;">Fast Delivery</h4>
+                    <p class="text-muted mb-0">Next-day delivery on most items with real-time tracking</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card text-center p-4 h-100" style="background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05);">
+                    <div class="feature-icon mb-4" style="width: 80px; height: 80px; margin: 0 auto; background: rgba(255, 215, 0, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-shield-alt" style="font-size: 2rem; color: #ffd700;"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3" style="color: #1a1a1a;">Quality Guarantee</h4>
+                    <p class="text-muted mb-0">All products come with comprehensive warranty protection</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card text-center p-4 h-100" style="background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05);">
+                    <div class="feature-icon mb-4" style="width: 80px; height: 80px; margin: 0 auto; background: rgba(255, 215, 0, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-headset" style="font-size: 2rem; color: #ffd700;"></i>
+                    </div>
+                    <h4 class="fw-bold mb-3" style="color: #1a1a1a;">Expert Support</h4>
+                    <p class="text-muted mb-0">Professional advice from industry experts</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Categories Section -->
+{% if categories %}
+<section id="categories" class="py-5" style="background: white;">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="display-5 fw-bold mb-3" style="color: #1a1a1a;">
+                Product Categories
+            </h2>
+            <p class="lead text-muted" style="font-size: 1.2rem;">Explore our comprehensive hardware categories</p>
+            <div class="divider mx-auto" style="width: 80px; height: 4px; background: #ffd700;"></div>
+        </div>
+        
+        <div class="row g-4">
+            {% for category in categories %}
+            <div class="col-md-4">
+                <div class="category-card h-100 position-relative overflow-hidden" style="background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); border-left: 4px solid #ffd700;">
+                    <div class="category-content p-4">
+                        <div class="d-flex align-items-center mb-4">
+                            <div class="category-icon me-3" style="width: 50px; height: 50px; background: rgba(255, 215, 0, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-box" style="font-size: 1.5rem; color: #ffd700;"></i>
+                            </div>
+                            <h4 class="fw-bold mb-0" style="color: #1a1a1a;">{{ category.name }}</h4>
+                        </div>
+                        
+                        {% if category.description %}
+                        <p class="text-muted mb-4">{{ category.description }}</p>
+                        {% endif %}
+                        
+                        <a href="{{ url_for('products', category=category.id) }}" class="btn fw-bold" style="background: rgba(26, 26, 26, 0.05); color: #1a1a1a; border: none; border-radius: 6px; padding: 0.75rem 1.5rem; width: 100%;">
+                            <i class="fas fa-arrow-right me-2"></i>Browse Products
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Featured Products Section -->
+{% if products %}
+<section class="py-5" style="background: #f8f9fa;">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="display-5 fw-bold mb-3" style="color: #1a1a1a;">
+                Featured Products
+            </h2>
+            <p class="lead text-muted" style="font-size: 1.2rem;">Premium tools selected by our experts</p>
+            <div class="divider mx-auto" style="width: 80px; height: 4px; background: #ffd700;"></div>
+        </div>
+        
+        <div class="row g-4">
+            {% for product in products %}
+            <div class="col-md-6 col-lg-3">
+                <div class="product-card h-100 position-relative" style="background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05);">
+                    <!-- Product Image -->
+                    <div class="product-image-container position-relative overflow-hidden" style="height: 200px; background: #f8f9fa; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                        {% if product.image_url %}
+                        <img src="{{ product.image_url }}" class="w-100 h-100" alt="{{ product.name }}" style="object-fit: cover;">
+                        {% else %}
+                        <div class="w-100 h-100 d-flex align-items-center justify-content-center">
+                            <i class="fas fa-image text-muted" style="font-size: 3rem;"></i>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Product Info -->
+                    <div class="product-info p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #1a1a1a; line-height: 1.3;">{{ product.name }}</h5>
+                            {% if product.stock and product.stock > 0 %}
+                            <span class="badge py-2" style="background: rgba(40, 167, 69, 0.1); color: #28a745; border-radius: 10px; font-size: 0.75rem;">
+                                <i class="fas fa-check me-1"></i>In Stock
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if product.category %}
+                        <div class="mb-3">
+                            <span class="badge py-2" style="background: rgba(26, 26, 26, 0.05); color: #1a1a1a; border-radius: 10px; font-size: 0.75rem;">{{ product.category.name }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="price mb-3">
+                            {% if product.sellingprice %}
+                            <span class="fw-bold" style="font-size: 1.3rem; color: #1a1a1a;">Ksh {{ "%.2f"|format(product.sellingprice) }}</span>
+                            {% else %}
+                            <span class="text-muted">Price not available</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn flex-fill fw-bold" style="background: rgba(26, 26, 26, 0.05); color: #1a1a1a; border: none; border-radius: 6px; padding: 0.75rem;">
+                                <i class="fas fa-eye me-1"></i>Details
+                            </a>
+                            {% if product.sellingprice %}
+                            <button class="btn flex-fill fw-bold" onclick="addToCart({{ product.id }})" style="background: rgba(255, 215, 0, 0.1); color: #1a1a1a; border: none; border-radius: 6px; padding: 0.75rem;">
+                                <i class="fas fa-cart-plus me-1"></i>Add
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="text-center mt-5">
+            <a href="{{ url_for('products') }}" class="btn btn-lg px-5 py-3 fw-bold" style="background: linear-gradient(45deg, #ffd700, #ffed4e); color: #1a1a1a; border: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.25);">
+                <i class="fas fa-shopping-bag me-2"></i>View All Products
+            </a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Testimonials Section -->
+<section class="py-5" style="background: white;">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="display-5 fw-bold mb-3" style="color: #1a1a1a;">
+                Customer Testimonials
+            </h2>
+            <p class="lead text-muted" style="font-size: 1.2rem;">What our clients say about us</p>
+            <div class="divider mx-auto" style="width: 80px; height: 4px; background: #ffd700;"></div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="testimonial-card p-4" style="background: #f8f9fa; border-radius: 12px;">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="avatar me-3" style="width: 50px; height: 50px; background: #e9ecef; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-user" style="font-size: 1.5rem; color: #6c757d;"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0" style="color: #1a1a1a;">James Wilson</h5>
+                            <p class="text-muted mb-0">Contractor</p>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0">
+                        "The quality of tools from ABZ Hardware has transformed our construction projects. Their professional-grade equipment stands up to daily use on job sites."
+                    </p>
+                    <div class="rating mt-3">
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="testimonial-card p-4" style="background: #f8f9fa; border-radius: 12px;">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="avatar me-3" style="width: 50px; height: 50px; background: #e9ecef; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-user" style="font-size: 1.5rem; color: #6c757d;"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0" style="color: #1a1a1a;">Sarah Johnson</h5>
+                            <p class="text-muted mb-0">Home Renovator</p>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0">
+                        "As a serious DIY enthusiast, I appreciate the quality and selection at ABZ Hardware. Their expert advice helped me complete my home renovation project."
+                    </p>
+                    <div class="rating mt-3">
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="testimonial-card p-4" style="background: #f8f9fa; border-radius: 12px;">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="avatar me-3" style="width: 50px; height: 50px; background: #e9ecef; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-user" style="font-size: 1.5rem; color: #6c757d;"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0" style="color: #1a1a1a;">Michael Thompson</h5>
+                            <p class="text-muted mb-0">Building Contractor</p>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0">
+                        "Reliable delivery and top-quality products. ABZ Hardware has been our trusted supplier for over 5 years. Their professional service is unmatched."
+                    </p>
+                    <div class="rating mt-3">
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                        <i class="fas fa-star" style="color: #ffd700;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-5" style="background: linear-gradient(to right, #1a1a1a, #2d2d2d);">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8 text-white">
+                <h2 class="display-5 fw-bold mb-3">Get Professional Tools</h2>
+                <p class="lead mb-4" style="color: #e0e0e0;">Sign up for exclusive access to our premium hardware collection and professional resources.</p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="{{ url_for('register') }}" class="btn btn-lg px-5 py-3 fw-bold" style="background: linear-gradient(45deg, #ffd700, #ffed4e); color: #1a1a1a; border: none; border-radius: 8px;">
+                        <i class="fas fa-user-plus me-2"></i>Create Account
+                    </a>
+                    <a href="{{ url_for('products') }}" class="btn btn-outline-light btn-lg px-5 py-3 fw-bold" style="border: 2px solid #ffd700; color: #ffd700; border-radius: 8px;">
+                        <i class="fas fa-shopping-bag me-2"></i>Browse Products
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 text-center mt-4 mt-lg-0">
+                <div class="cta-icon" style="font-size: 5rem; color: #ffd700;">
+                    <i class="fas fa-tools"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Custom Styles -->
+<style>
+    .hero-section {
+        padding: 100px 0;
+    }
+    
+    .divider {
+        margin-top: 15px;
+    }
+    
+    .category-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .category-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+    }
+    
+    .product-card {
+        transition: transform 0.3s ease;
+    }
+    
+    .product-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .testimonial-card {
+        transition: transform 0.3s ease;
+    }
+    
+    .testimonial-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .btn {
+        transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+        transform: translateY(-3px);
+    }
+    
+    .feature-card {
+        transition: transform 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .hero-section {
+            padding: 60px 0;
+        }
+        
+        .hero-buttons .btn {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .hero-stats {
+            justify-content: center;
+        }
+    }
+</style>
+
+<!-- Animation Library -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+<!-- JavaScript for smooth scrolling -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+    
+    // Add scroll animations
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('animate__animated', 'animate__fadeInUp');
+            }
+        });
+    }, observerOptions);
+    
+    document.querySelectorAll('.category-card, .product-card, .feature-card, .testimonial-card').forEach(el => {
+        observer.observe(el);
+    });
+});
+</script>
+{% endblock %}

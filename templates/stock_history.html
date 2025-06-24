@@ -1,0 +1,118 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Stock History</h3>
+        <h6 class="op-7 mb-2">Transaction history for {{ product.name }}</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('products') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Products
+        </a>
+      </div>
+    </div>
+
+    <!-- Product Info Card -->
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Product Information</h4>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-3">
+                <strong>Product Name:</strong><br>
+                {{ product.name }}
+              </div>
+              <div class="col-md-3">
+                <strong>Category:</strong><br>
+                {{ product.category.name }}
+              </div>
+              <div class="col-md-3">
+                <strong>Current Stock:</strong><br>
+                <span class="badge bg-primary">{{ product.stock or 0 }}</span>
+              </div>
+              <div class="col-md-3">
+                <strong>Product Code:</strong><br>
+                {{ product.productcode or 'N/A' }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stock Transactions Table -->
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <h4 class="card-title">Stock Transactions</h4>
+              <div class="card-tools">
+                <button class="btn btn-icon btn-link btn-primary btn-xs" data-bs-toggle="collapse" data-bs-target="#transactionsCollapse">
+                  <span class="fa fa-angle-down"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="card-body collapse show" id="transactionsCollapse">
+            {% if transactions %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Previous Stock</th>
+                    <th>New Stock</th>
+                    <th>User</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for transaction in transactions %}
+                  <tr>
+                    <td>{{ transaction.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                      {% if transaction.transaction_type == 'add' %}
+                        <span class="badge bg-success">Add</span>
+                      {% else %}
+                        <span class="badge bg-warning">Remove</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if transaction.transaction_type == 'add' %}
+                        <span class="text-success">+{{ transaction.quantity }}</span>
+                      {% else %}
+                        <span class="text-danger">-{{ transaction.quantity }}</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ transaction.previous_stock }}</td>
+                    <td>{{ transaction.new_stock }}</td>
+                    <td>{{ transaction.user.firstname }} {{ transaction.user.lastname }}</td>
+                    <td>{{ transaction.notes or 'No notes' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-history fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No stock transactions found</h5>
+              <p class="text-muted">Stock transactions will appear here when you add or remove stock.</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

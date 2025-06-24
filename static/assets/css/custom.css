@@ -1,0 +1,126 @@
+/* Custom Logo Styling for ABZ Hardware Admin Portal */
+
+/* Sidebar Logo Styling */
+.sidebar .logo-header {
+  padding: 15px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  min-height: 80px !important;
+}
+
+.sidebar .logo {
+  display: flex !important;
+  align-items: center !important;
+  text-decoration: none !important;
+}
+
+.sidebar .logo img {
+  max-height: 50px !important;
+  width: auto !important;
+  object-fit: contain !important;
+}
+
+/* Main Header Logo Styling */
+.main-header .logo-header {
+  padding: 10px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 70px !important;
+}
+
+.main-header .logo {
+  display: flex !important;
+  align-items: center !important;
+  text-decoration: none !important;
+}
+
+.main-header .logo img {
+  max-height: 40px !important;
+  width: auto !important;
+  object-fit: contain !important;
+}
+
+/* Navigation Toggle Buttons */
+.nav-toggle {
+  display: flex !important;
+  gap: 5px !important;
+}
+
+.btn-toggle {
+  padding: 8px 12px !important;
+  border: none !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+  border-radius: 4px !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-toggle:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: scale(1.05) !important;
+}
+
+/* Enhanced Active Page Indicator */
+.sidebar .nav-item.active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-left: 4px solid #177dff !important;
+  border-radius: 0 4px 4px 0 !important;
+}
+
+.sidebar .nav-item.active a {
+  color: #177dff !important;
+  font-weight: 600 !important;
+}
+
+.sidebar .nav-item.active i {
+  color: #177dff !important;
+}
+
+.sidebar .nav-item.active p {
+  color: #177dff !important;
+  font-weight: 600 !important;
+}
+
+/* Hover effects for nav items */
+.sidebar .nav-item:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  transition: all 0.3s ease !important;
+}
+
+.sidebar .nav-item:hover a {
+  color: #177dff !important;
+}
+
+.sidebar .nav-item:hover i {
+  color: #177dff !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sidebar .logo img {
+    max-height: 40px !important;
+  }
+  
+  .main-header .logo img {
+    max-height: 35px !important;
+  }
+  
+  .sidebar .logo-header,
+  .main-header .logo-header {
+    padding: 10px 15px !important;
+  }
+}
+
+/* Logo container improvements */
+.logo-header {
+  background: transparent !important;
+}
+
+/* Ensure logo doesn't overflow */
+.logo img {
+  max-width: 100% !important;
+  height: auto !important;
+} 

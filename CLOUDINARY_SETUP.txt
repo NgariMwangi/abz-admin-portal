@@ -1,0 +1,90 @@
+CLOUDINARY SETUP GUIDE FOR ABZ HARDWARE ADMIN PORTAL
+====================================================
+
+Your ABZ Hardware admin portal has been successfully integrated with Cloudinary for cloud-based image storage!
+
+WHAT'S BEEN IMPLEMENTED:
+- Cloudinary SDK installed and configured
+- Image upload functions updated to use Cloudinary
+- Image deletion functions updated to clean up Cloudinary storage
+- Configuration file created for easy credential management
+- Templates already support Cloudinary URLs
+- Environment variable support added for security
+
+SETUP STEPS:
+============
+
+1. CREATE CLOUDINARY ACCOUNT:
+   - Go to https://cloudinary.com/
+   - Sign up for a free account
+   - Verify your email
+
+2. GET YOUR CREDENTIALS:
+   - Log into Cloudinary dashboard
+   - Go to "Dashboard" section
+   - Copy your:
+     * Cloud Name
+     * API Key  
+     * API Secret
+
+3. CONFIGURE CREDENTIALS (Choose one method):
+
+   METHOD A - Environment Variables (Recommended for Production):
+   - Create a file named ".env" in your project root
+   - Add your credentials:
+     CLOUDINARY_CLOUD_NAME=your_actual_cloud_name
+     CLOUDINARY_API_KEY=your_actual_api_key
+     CLOUDINARY_API_SECRET=your_actual_api_secret
+
+   METHOD B - Direct Configuration (For Development):
+   - Edit config.py file and replace placeholder values:
+     CLOUDINARY_CLOUD_NAME = 'your_actual_cloud_name'
+     CLOUDINARY_API_KEY = 'your_actual_api_key'
+     CLOUDINARY_API_SECRET = 'your_actual_api_secret'
+
+4. TEST THE INTEGRATION:
+   - Start your Flask app
+   - Go to Products page
+   - Try adding a new product with an image
+   - The image should upload to Cloudinary and display
+
+FEATURES:
+=========
+- Automatic image optimization (max 800x800px)
+- Images stored in 'abz_products' folder
+- Secure HTTPS URLs
+- Automatic cleanup of old images
+- Error handling for upload failures
+- Support for PNG, JPG, JPEG, GIF files
+- Environment variable support for secure credential management
+
+BENEFITS:
+=========
+- No server storage limitations
+- Global CDN for fast image loading
+- Automatic image optimization
+- Secure and reliable storage
+- Free tier: 25GB storage + 25GB bandwidth
+
+TROUBLESHOOTING:
+================
+- If images don't upload: Check your Cloudinary credentials
+- If images don't display: Verify the URL is accessible
+- For upload errors: Check file size (max 16MB) and format
+- If using .env file: Make sure it's in the project root directory
+
+SECURITY NOTES:
+==============
+- Never commit real credentials to version control
+- Use environment variables (.env file) for production
+- Add .env to your .gitignore file
+- Cloudinary URLs are secure HTTPS by default
+
+FILES CREATED/MODIFIED:
+======================
+- config.py: Configuration with Cloudinary settings
+- main.py: Updated with Cloudinary upload/delete functions
+- CLOUDINARY_SETUP.txt: This setup guide
+- .env: Create this file with your credentials (not tracked by git)
+
+The integration is complete and ready to use!

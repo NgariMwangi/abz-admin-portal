@@ -1,0 +1,9 @@
+version: '3'
+services:
+    web:
+        build: .
+        # env_file: .env
+        container_name: abz-admin-portal
+        restart: always
+        ports:
+            - 5035:80
