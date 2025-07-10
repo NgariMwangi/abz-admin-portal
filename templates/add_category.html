@@ -1,0 +1,137 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Add New Category</h3>
+        <h6 class="op-7 mb-2">Create a new product category</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('categories') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Categories
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Category Information</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <form method="POST" action="{{ url_for('add_category') }}">
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="form-group">
+                    <label for="name" class="form-label">Category Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="name" name="name" required 
+                           placeholder="Enter category name (e.g., Electronics, Clothing, Tools)">
+                    <small class="form-text text-muted">Choose a descriptive name that clearly identifies the category.</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row mt-3">
+                <div class="col-md-12">
+                  <div class="form-group">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="4" 
+                              placeholder="Enter a detailed description of this category (optional)"></textarea>
+                    <small class="form-text text-muted">Provide additional details about what products belong in this category.</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row mt-4">
+                <div class="col-md-12">
+                  <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-round">
+                      <i class="fas fa-save"></i> Create Category
+                    </button>
+                    <a href="{{ url_for('categories') }}" class="btn btn-secondary btn-round">
+                      <i class="fas fa-times"></i> Cancel
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Tips</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="alert alert-info">
+              <h6><i class="fas fa-lightbulb"></i> Category Best Practices</h6>
+              <ul class="mb-0">
+                <li>Use clear, descriptive names</li>
+                <li>Keep categories broad but specific</li>
+                <li>Consider your inventory structure</li>
+                <li>Use consistent naming conventions</li>
+              </ul>
+            </div>
+
+            <div class="alert alert-warning">
+              <h6><i class="fas fa-exclamation-triangle"></i> Important Notes</h6>
+              <ul class="mb-0">
+                <li>Category names must be unique</li>
+                <li>Categories cannot be deleted if they have products</li>
+                <li>You can edit categories later</li>
+              </ul>
+            </div>
+
+            <div class="text-center">
+              <i class="fas fa-tags fa-2x text-muted mb-2"></i>
+              <p class="text-muted small">Categories help organize your products and improve customer experience</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name');
+    
+    form.addEventListener('submit', function(e) {
+        const name = nameInput.value.trim();
+        
+        if (!name) {
+            e.preventDefault();
+            alert('Please enter a category name.');
+            nameInput.focus();
+            return false;
+        }
+        
+        if (name.length < 2) {
+            e.preventDefault();
+            alert('Category name must be at least 2 characters long.');
+            nameInput.focus();
+            return false;
+        }
+    });
+    
+    // Auto-resize textarea
+    const descriptionTextarea = document.getElementById('description');
+    descriptionTextarea.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+});
+</script>
+{% endblock %} 

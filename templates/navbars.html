@@ -166,6 +166,51 @@
                 <p>Products</p>
               </a>
             </li>
+            <li class="nav-item {% if request.endpoint in ['branches', 'add_branch', 'edit_branch', 'branch_details'] %}active{% endif %}">
+              <a href="{{ url_for('branches') }}">
+                <i class="fas fa-building"></i>
+                <p>Branches</p>
+              </a>
+            </li>
+            <li class="nav-item {% if request.endpoint in ['categories', 'add_category', 'edit_category', 'category_details'] %}active{% endif %}">
+              <a href="{{ url_for('categories') }}">
+                <i class="fas fa-tags"></i>
+                <p>Categories</p>
+              </a>
+            </li>
+            <li class="nav-item {% if request.endpoint in ['orders', 'order_details'] %}active{% endif %}">
+              <a href="{{ url_for('orders') }}">
+                <i class="fas fa-shopping-cart"></i>
+                <p>Orders</p>
+              </a>
+            </li>
+            <li class="nav-item {% if request.endpoint in ['users', 'add_user', 'edit_user'] %}active{% endif %}">
+              <a href="{{ url_for('users') }}">
+                <i class="fas fa-users"></i>
+                <p>User Management</p>
+              </a>
+            </li>
+            <li class="nav-item {% if request.endpoint in ['profit_loss', 'balance_sheet'] %}active{% endif %}">
+              <a data-bs-toggle="collapse" href="#financialReports">
+                <i class="fas fa-chart-line"></i>
+                <p>Financial Reports</p>
+                <span class="caret"></span>
+              </a>
+              <div class="collapse" id="financialReports">
+                <ul class="nav nav-collapse">
+                  <li class="nav-item {% if request.endpoint == 'profit_loss' %}active{% endif %}">
+                    <a href="{{ url_for('profit_loss') }}">
+                      <span class="sub-item">Profit & Loss</span>
+                    </a>
+                  </li>
+                  <li class="nav-item {% if request.endpoint == 'balance_sheet' %}active{% endif %}">
+                    <a href="{{ url_for('balance_sheet') }}">
+                      <span class="sub-item">Balance Sheet</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
           </ul>
         </div>
       </div>
@@ -556,6 +601,30 @@
       </div>
       <!-- End Sidebar -->
 
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages" style="position: fixed; top: 80px; right: 20px; z-index: 9999; max-width: 400px;">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+          <script>
+            // Auto-hide flash messages after 5 seconds
+            setTimeout(function() {
+              const alerts = document.querySelectorAll('.flash-messages .alert');
+              alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+              });
+            }, 5000);
+          </script>
+        {% endif %}
+      {% endwith %}
+
       {% block content %}
       <!-- Child templates will insert content here -->
       {% endblock %}
@@ -854,6 +923,26 @@ document.addEventListener('DOMContentLoaded', function() {
     } else if (currentPath === '/products') {
         activeItem = document.querySelector('.sidebar a[href="/products"]').closest('.nav-item');
         console.log('Setting Products as active');
+    } else if (currentPath === '/orders' || currentPath.startsWith('/order_details/')) {
+        activeItem = document.querySelector('.sidebar a[href="/orders"]').closest('.nav-item');
+        console.log('Setting Orders as active');
+    } else if (currentPath === '/users' || currentPath === '/add_user' || currentPath === '/edit_user') {
+        activeItem = document.querySelector('.sidebar a[href="/users"]').closest('.nav-item');
+        console.log('Setting User Management as active');
+    } else if (currentPath === '/profit_loss' || currentPath === '/balance_sheet') {
+        activeItem = document.querySelector('.sidebar a[data-bs-toggle="collapse"]').closest('.nav-item');
+        console.log('Setting Financial Reports as active');
+        
+        // Expand the financial reports dropdown
+        const financialReportsCollapse = document.getElementById('financialReports');
+        if (financialReportsCollapse) {
+            const bsCollapse = new bootstrap.Collapse(financialReportsCollapse, {
+                show: true
+            });
+        }
+    } else if (currentPath === '/branches' || currentPath === '/add_branch' || currentPath === '/edit_branch' || currentPath === '/branch_details') {
+        activeItem = document.querySelector('.sidebar a[href="/branches"]').closest('.nav-item');
+        console.log('Setting Branches as active');
     }
     
     if (activeItem) {

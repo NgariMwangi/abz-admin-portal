@@ -1,0 +1,114 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Add New Branch</h3>
+        <h6 class="op-7 mb-2">Create a new branch location</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('branches') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Branches
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-8 mx-auto">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Branch Information</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <form method="POST" action="{{ url_for('add_branch') }}">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label for="name" class="form-label">Branch Name *</label>
+                    <input type="text" class="form-control" id="name" name="name" required 
+                           placeholder="Enter branch name">
+                    <small class="form-text text-muted">Choose a unique name for this branch</small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label for="location" class="form-label">Location *</label>
+                    <input type="text" class="form-control" id="location" name="location" required 
+                           placeholder="Enter branch location">
+                    <small class="form-text text-muted">Full address or location description</small>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="row mt-4">
+                <div class="col-md-12">
+                  <div class="form-group">
+                    <label class="form-label">Branch Details</label>
+                    <div class="alert alert-info">
+                      <i class="fas fa-info-circle"></i>
+                      <strong>Note:</strong> After creating the branch, you can add products and manage inventory for this location.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="row mt-4">
+                <div class="col-md-12">
+                  <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-round">
+                      <i class="fas fa-save"></i> Create Branch
+                    </button>
+                    <a href="{{ url_for('branches') }}" class="btn btn-secondary btn-round">
+                      <i class="fas fa-times"></i> Cancel
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name');
+    const locationInput = document.getElementById('location');
+    
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+        
+        // Clear previous error states
+        nameInput.classList.remove('is-invalid');
+        locationInput.classList.remove('is-invalid');
+        
+        // Validate name
+        if (!nameInput.value.trim()) {
+            nameInput.classList.add('is-invalid');
+            isValid = false;
+        }
+        
+        // Validate location
+        if (!locationInput.value.trim()) {
+            locationInput.classList.add('is-invalid');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+        }
+    });
+    
+    // Auto-focus on name field
+    nameInput.focus();
+});
+</script>
+{% endblock %} 

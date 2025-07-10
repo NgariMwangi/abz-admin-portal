@@ -1,0 +1,381 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Order Management</h3>
+        <h6 class="op-7 mb-2">View and manage customer orders</h6>
+      </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Filters</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <form method="GET" action="{{ url_for('orders') }}" class="row g-3">
+              <div class="col-md-3">
+                <label for="status" class="form-label">Approval Status</label>
+                <select class="form-control" id="status" name="status">
+                  <option value="">All Orders</option>
+                  <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending Approval</option>
+                  <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="payment_status" class="form-label">Payment Status</label>
+                <select class="form-control" id="payment_status" name="payment_status">
+                  <option value="">All Payments</option>
+                  <option value="pending" {% if payment_filter == 'pending' %}selected{% endif %}>Pending</option>
+                  <option value="paid" {% if payment_filter == 'paid' %}selected{% endif %}>Paid</option>
+                  <option value="failed" {% if payment_filter == 'failed' %}selected{% endif %}>Failed</option>
+                  <option value="refunded" {% if payment_filter == 'refunded' %}selected{% endif %}>Refunded</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="branch_id" class="form-label">Branch</label>
+                <select class="form-control" id="branch_id" name="branch_id">
+                  <option value="">All Branches</option>
+                  {% for branch in branches %}
+                  <option value="{{ branch.id }}" {% if branch_filter == branch.id %}selected{% endif %}>{{ branch.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                  <i class="fas fa-filter"></i> Apply Filters
+                </button>
+                <a href="{{ url_for('orders') }}" class="btn btn-secondary">
+                  <i class="fas fa-times"></i> Clear
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">All Orders</div>
+              <div class="card-tools">
+                <span class="badge badge-primary">{{ orders|length }} orders</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if orders %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Order Type</th>
+                    <th>Branch</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for order in orders %}
+                  <tr>
+                    <td>
+                      <strong>#{{ order.id }}</strong>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-3">
+                          <span class="text-white fw-bold">{{ order.user.firstname[0] }}{{ order.user.lastname[0] }}</span>
+                        </div>
+                        <div>
+                          <div class="fw-bold">{{ order.user.firstname }} {{ order.user.lastname }}</div>
+                          <small class="text-muted">{{ order.user.email }}</small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="badge badge-info">{{ order.ordertype.name }}</span>
+                    </td>
+                    <td>
+                      <span class="badge badge-secondary">{{ order.branch.name }}</span>
+                    </td>
+                    <td>
+                      <span class="badge badge-light">{{ order.order_items|length }} items</span>
+                    </td>
+                    <td>
+                      {% set total = 0 %}
+                      {% for item in order.order_items %}
+                        {% if item.product and item.product.sellingprice %}
+                          {% set total = total + (item.product.sellingprice * item.quantity) %}
+                        {% endif %}
+                      {% endfor %}
+                      <strong>${{ "%.2f"|format(total) }}</strong>
+                    </td>
+                    <td>
+                      {% if order.approvalstatus %}
+                        <span class="badge badge-success">
+                          <i class="fas fa-check"></i> Approved
+                        </span>
+                      {% else %}
+                        <span class="badge badge-warning">
+                          <i class="fas fa-clock"></i> Pending
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if order.payment_status == 'paid' %}
+                        <span class="badge badge-success">
+                          <i class="fas fa-credit-card"></i> Paid
+                        </span>
+                      {% elif order.payment_status == 'pending' %}
+                        <span class="badge badge-warning">
+                          <i class="fas fa-clock"></i> Pending
+                        </span>
+                      {% elif order.payment_status == 'failed' %}
+                        <span class="badge badge-danger">
+                          <i class="fas fa-times"></i> Failed
+                        </span>
+                      {% elif order.payment_status == 'refunded' %}
+                        <span class="badge badge-info">
+                          <i class="fas fa-undo"></i> Refunded
+                        </span>
+                      {% else %}
+                        <span class="badge badge-secondary">{{ order.payment_status }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div>
+                        <div>{{ order.created_at.strftime('%b %d, %Y') }}</div>
+                        <small class="text-muted">{{ order.created_at.strftime('%I:%M %p') }}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="btn-group" role="group">
+                        <a href="{{ url_for('order_details', order_id=order.id) }}" class="btn btn-sm btn-outline-info" title="View Details">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                        {% if not order.approvalstatus %}
+                        <button type="button" class="btn btn-sm btn-outline-success" 
+                                onclick="approveOrder({{ order.id }})" 
+                                title="Approve Order">
+                          <i class="fas fa-check"></i>
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-outline-warning" 
+                                onclick="rejectOrder({{ order.id }})" 
+                                title="Reject Order">
+                          <i class="fas fa-times"></i>
+                        </button>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Order pagination">
+              <ul class="pagination justify-content-center">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('orders', page=pagination.prev_num, status=status_filter, payment_status=payment_filter, branch_id=branch_filter) }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                  </a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in pagination.iter_pages() %}
+                  {% if page_num %}
+                    {% if page_num != pagination.page %}
+                    <li class="page-item">
+                      <a class="page-link" href="{{ url_for('orders', page=page_num, status=status_filter, payment_status=payment_filter, branch_id=branch_filter) }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ page_num }}</span>
+                    </li>
+                    {% endif %}
+                  {% else %}
+                    <li class="page-item disabled">
+                      <span class="page-link">...</span>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('orders', page=pagination.next_num, status=status_filter, payment_status=payment_filter, branch_id=branch_filter) }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                  </a>
+                </li>
+                {% endif %}
+              </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+              <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No orders found</h5>
+              <p class="text-muted">No orders match your current filters.</p>
+              <a href="{{ url_for('orders') }}" class="btn btn-primary btn-round">
+                <i class="fas fa-refresh"></i> Clear Filters
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Summary Cards -->
+    <div class="row mt-4">
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+              <i class="fas fa-clock"></i>
+            </div>
+            <h4 class="card-title">{{ orders|selectattr('approvalstatus', 'equalto', false)|list|length }}</h4>
+            <p class="card-category">Pending Approval</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-check"></i>
+            </div>
+            <h4 class="card-title">{{ orders|selectattr('approvalstatus', 'equalto', true)|list|length }}</h4>
+            <p class="card-category">Approved Orders</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-credit-card"></i>
+            </div>
+            <h4 class="card-title">{{ orders|selectattr('payment_status', 'equalto', 'paid')|list|length }}</h4>
+            <p class="card-category">Paid Orders</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+              <i class="fas fa-clock"></i>
+            </div>
+            <h4 class="card-title">{{ orders|selectattr('payment_status', 'equalto', 'pending')|list|length }}</h4>
+            <p class="card-category">Pending Payment</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Approve/Reject Confirmation Modals -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="approveModalLabel">Confirm Approval</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to approve this order?</p>
+        <p class="text-success"><small>This will mark the order as approved.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="approveForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-success">Approve Order</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rejectModalLabel">Confirm Rejection</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to reject this order?</p>
+        <p class="text-warning"><small>This will mark the order as pending approval.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="rejectForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-warning">Reject Order</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function approveOrder(orderId) {
+    document.getElementById('approveForm').action = "{{ url_for('approve_order', order_id=0) }}".replace('0', orderId);
+    
+    const approveModal = new bootstrap.Modal(document.getElementById('approveModal'));
+    approveModal.show();
+}
+
+function rejectOrder(orderId) {
+    document.getElementById('rejectForm').action = "{{ url_for('reject_order', order_id=0) }}".replace('0', orderId);
+    
+    const rejectModal = new bootstrap.Modal(document.getElementById('rejectModal'));
+    rejectModal.show();
+}
+
+// Add some styling for the avatar
+document.addEventListener('DOMContentLoaded', function() {
+    // Add custom styles for better table appearance
+    const style = document.createElement('style');
+    style.textContent = `
+        .avatar-sm {
+            width: 40px;
+            height: 40px;
+            font-size: 14px;
+        }
+        .table td {
+            vertical-align: middle;
+        }
+        .btn-group .btn {
+            margin-right: 2px;
+        }
+        .badge {
+            font-size: 0.75em;
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
+{% endblock %} 

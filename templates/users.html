@@ -1,0 +1,262 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">User Management</h3>
+        <h6 class="op-7 mb-2">Manage system users and their roles</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('add_user') }}" class="btn btn-primary btn-round">
+          <i class="fas fa-plus"></i> Add New User
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">All Users</div>
+              <div class="card-tools">
+                <span class="badge badge-primary">{{ users|length }} users</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if users %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for user in users %}
+                  <tr>
+                    <td>{{ user.id }}</td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-3">
+                          <span class="text-white fw-bold">{{ user.firstname[0] }}{{ user.lastname[0] }}</span>
+                        </div>
+                        <div>
+                          <div class="fw-bold">{{ user.firstname }} {{ user.lastname }}</div>
+                          <small class="text-muted">User #{{ user.id }}</small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div>
+                        <div>{{ user.email }}</div>
+                        {% if user.id == current_user.id %}
+                        <small class="badge badge-success">Current User</small>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td>
+                      {% if user.role == 'admin' %}
+                        <span class="badge badge-primary">
+                          <i class="fas fa-shield-alt"></i> Admin
+                        </span>
+                      {% elif user.role == 'sales' %}
+                        <span class="badge badge-info">
+                          <i class="fas fa-chart-line"></i> Sales
+                        </span>
+                      {% elif user.role == 'customer' %}
+                        <span class="badge badge-warning">
+                          <i class="fas fa-user"></i> Customer
+                        </span>
+                      {% else %}
+                        <span class="badge badge-secondary">{{ user.role }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div>
+                        <div>{{ user.created_at.strftime('%b %d, %Y') }}</div>
+                        <small class="text-muted">{{ user.created_at.strftime('%I:%M %p') }}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="btn-group" role="group">
+                        <a href="{{ url_for('edit_user', id=user.id) }}" class="btn btn-sm btn-outline-primary" title="Edit User">
+                          <i class="fas fa-edit"></i>
+                        </a>
+                        {% if user.id != current_user.id %}
+                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                onclick="confirmDelete({{ user.id }}, '{{ user.firstname }} {{ user.lastname }}')" 
+                                title="Delete User">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot delete your own account">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="User pagination">
+              <ul class="pagination justify-content-center">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('users', page=pagination.prev_num) }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                  </a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in pagination.iter_pages() %}
+                  {% if page_num %}
+                    {% if page_num != pagination.page %}
+                    <li class="page-item">
+                      <a class="page-link" href="{{ url_for('users', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ page_num }}</span>
+                    </li>
+                    {% endif %}
+                  {% else %}
+                    <li class="page-item disabled">
+                      <span class="page-link">...</span>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('users', page=pagination.next_num) }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                  </a>
+                </li>
+                {% endif %}
+              </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+              <i class="fas fa-users fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No users found</h5>
+              <p class="text-muted">Get started by adding your first user.</p>
+              <a href="{{ url_for('add_user') }}" class="btn btn-primary btn-round">
+                <i class="fas fa-plus"></i> Add First User
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Role Summary Cards -->
+    <div class="row mt-4">
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+              <i class="fas fa-shield-alt"></i>
+            </div>
+            <h4 class="card-title">{{ users|selectattr('role', 'equalto', 'admin')|list|length }}</h4>
+            <p class="card-category">Administrators</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <h4 class="card-title">{{ users|selectattr('role', 'equalto', 'sales')|list|length }}</h4>
+            <p class="card-category">Sales Staff</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+              <i class="fas fa-user"></i>
+            </div>
+            <h4 class="card-title">{{ users|selectattr('role', 'equalto', 'customer')|list|length }}</h4>
+            <p class="card-category">Customers</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete user <strong id="deleteUserName"></strong>?</p>
+        <p class="text-danger"><small>This action cannot be undone.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-danger">Delete User</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDelete(userId, userName) {
+    document.getElementById('deleteUserName').textContent = userName;
+    document.getElementById('deleteForm').action = "{{ url_for('delete_user', id=0) }}".replace('0', userId);
+    
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    deleteModal.show();
+}
+
+// Add some styling for the avatar
+document.addEventListener('DOMContentLoaded', function() {
+    // Add custom styles for better table appearance
+    const style = document.createElement('style');
+    style.textContent = `
+        .avatar-sm {
+            width: 40px;
+            height: 40px;
+            font-size: 14px;
+        }
+        .table td {
+            vertical-align: middle;
+        }
+        .btn-group .btn {
+            margin-right: 2px;
+        }
+        .badge {
+            font-size: 0.75em;
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,514 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Balance Sheet</h3>
+        <h6 class="op-7 mb-2">Financial position as of {{ as_of_date }}</h6>
+      </div>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">As of Date</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <form method="GET" action="{{ url_for('balance_sheet') }}" class="row g-3">
+              <div class="col-md-4">
+                <label for="as_of_date" class="form-label">Balance Sheet Date</label>
+                <input type="date" class="form-control" id="as_of_date" name="as_of_date" value="{{ as_of_date }}" required>
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                  <i class="fas fa-calendar"></i> Update
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="setToday()">
+                  <i class="fas fa-calendar-day"></i> Today
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+              <i class="fas fa-building"></i>
+            </div>
+            <h4 class="card-title text-primary">${{ "%.2f"|format(total_assets) }}</h4>
+            <p class="card-category">Total Assets</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+              <i class="fas fa-boxes"></i>
+            </div>
+            <h4 class="card-title text-warning">${{ "%.2f"|format(inventory_value) }}</h4>
+            <p class="card-category">Inventory Value</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <h4 class="card-title text-success">${{ "%.2f"|format(cash) }}</h4>
+            <p class="card-category">Cash</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <h4 class="card-title text-info">${{ "%.2f"|format(retained_earnings) }}</h4>
+            <p class="card-category">Retained Earnings</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Balance Sheet -->
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Assets</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-borderless">
+                <tbody>
+                  <tr class="border-bottom">
+                    <td class="fw-bold">Current Assets</td>
+                    <td class="text-end fw-bold"></td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Cash</td>
+                    <td class="text-end">${{ "%.2f"|format(cash) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Accounts Receivable</td>
+                    <td class="text-end">${{ "%.2f"|format(accounts_receivable) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Inventory</td>
+                    <td class="text-end">${{ "%.2f"|format(inventory_value) }}</td>
+                  </tr>
+                  <tr class="border-bottom border-2">
+                    <td class="fw-bold">Total Current Assets</td>
+                    <td class="text-end fw-bold text-primary">${{ "%.2f"|format(cash + accounts_receivable + inventory_value) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Fixed Assets</td>
+                    <td class="text-end fw-bold"></td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Equipment & Machinery</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Furniture & Fixtures</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Buildings & Land</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr class="border-bottom border-2">
+                    <td class="fw-bold">Total Fixed Assets</td>
+                    <td class="text-end fw-bold">$0.00</td>
+                  </tr>
+                  <tr class="border-bottom border-3">
+                    <td class="fw-bold fs-5">Total Assets</td>
+                    <td class="text-end fw-bold fs-5 text-primary">${{ "%.2f"|format(total_assets) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Liabilities & Equity</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-borderless">
+                <tbody>
+                  <tr class="border-bottom">
+                    <td class="fw-bold">Current Liabilities</td>
+                    <td class="text-end fw-bold"></td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Accounts Payable</td>
+                    <td class="text-end">${{ "%.2f"|format(accounts_payable) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Accrued Expenses</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Short-term Loans</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr class="border-bottom border-2">
+                    <td class="fw-bold">Total Current Liabilities</td>
+                    <td class="text-end fw-bold text-danger">${{ "%.2f"|format(accounts_payable) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Long-term Liabilities</td>
+                    <td class="text-end fw-bold"></td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Long-term Loans</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Mortgages</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr class="border-bottom border-2">
+                    <td class="fw-bold">Total Long-term Liabilities</td>
+                    <td class="text-end fw-bold">$0.00</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Equity</td>
+                    <td class="text-end fw-bold"></td>
+                  </tr>
+                  <tr>
+                    <td class="ps-4">Retained Earnings</td>
+                    <td class="text-end">${{ "%.2f"|format(retained_earnings) }}</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Owner's Capital</td>
+                    <td class="text-end">$0.00</td>
+                  </tr>
+                  <tr class="border-bottom border-3">
+                    <td class="fw-bold fs-5">Total Liabilities & Equity</td>
+                    <td class="text-end fw-bold fs-5 text-primary">${{ "%.2f"|format(total_liabilities_equity) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Breakdown -->
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Inventory by Category</div>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if inventory_by_category %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Value</th>
+                    <th>% of Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for category in inventory_by_category %}
+                  <tr>
+                    <td>
+                      <div class="fw-bold">{{ category.name }}</div>
+                    </td>
+                    <td>
+                      <strong>${{ "%.2f"|format(category.value) }}</strong>
+                    </td>
+                    <td>
+                      <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-warning" role="progressbar" 
+                             style="width: {{ (category.value / inventory_value * 100) if inventory_value > 0 else 0 }}%">
+                          {{ "%.1f"|format((category.value / inventory_value * 100) if inventory_value > 0 else 0) }}%
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+                <tfoot>
+                  <tr class="table-active">
+                    <td class="fw-bold">Total Inventory</td>
+                    <td class="fw-bold">${{ "%.2f"|format(inventory_value) }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-boxes fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No inventory data</h5>
+              <p class="text-muted">No inventory found in the system.</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Recent Transactions</div>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if recent_transactions %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Branch</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for order, user, branch in recent_transactions %}
+                  <tr>
+                    <td>
+                      <a href="{{ url_for('order_details', order_id=order.id) }}" class="text-decoration-none">
+                        <strong>#{{ order.id }}</strong>
+                      </a>
+                    </td>
+                    <td>
+                      <div>{{ user.firstname }} {{ user.lastname }}</div>
+                      <small class="text-muted">{{ user.email }}</small>
+                    </td>
+                    <td>
+                      <span class="badge badge-secondary">{{ branch.name }}</span>
+                    </td>
+                    <td>
+                      <div>{{ order.created_at.strftime('%b %d') }}</div>
+                      <small class="text-muted">{{ order.created_at.strftime('%I:%M %p') }}</small>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No transactions</h5>
+              <p class="text-muted">No recent transactions found.</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Financial Ratios -->
+    <div class="row mt-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Financial Ratios</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h5 class="text-primary">Current Ratio</h5>
+                  <h3 class="fw-bold">
+                    {{ "%.2f"|format((cash + accounts_receivable + inventory_value) / accounts_payable if accounts_payable > 0 else 0) }}
+                  </h3>
+                  <small class="text-muted">Current Assets / Current Liabilities</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h5 class="text-success">Quick Ratio</h5>
+                  <h3 class="fw-bold">
+                    {{ "%.2f"|format((cash + accounts_receivable) / accounts_payable if accounts_payable > 0 else 0) }}
+                  </h3>
+                  <small class="text-muted">(Cash + Receivables) / Current Liabilities</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h5 class="text-warning">Debt-to-Equity</h5>
+                  <h3 class="fw-bold">
+                    {{ "%.2f"|format(accounts_payable / retained_earnings if retained_earnings > 0 else 0) }}
+                  </h3>
+                  <small class="text-muted">Total Liabilities / Total Equity</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h5 class="text-info">Return on Assets</h5>
+                  <h3 class="fw-bold">
+                    {{ "%.1f"|format((retained_earnings / total_assets * 100) if total_assets > 0 else 0) }}%
+                  </h3>
+                  <small class="text-muted">Net Income / Total Assets</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Assets Breakdown</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <canvas id="assetsChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Liabilities & Equity</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <canvas id="liabilitiesChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setToday() {
+    const today = new Date();
+    document.getElementById('as_of_date').value = today.toISOString().split('T')[0];
+}
+
+// Charts
+document.addEventListener('DOMContentLoaded', function() {
+    // Assets Chart
+    const assetsCtx = document.getElementById('assetsChart').getContext('2d');
+    new Chart(assetsCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Cash', 'Accounts Receivable', 'Inventory'],
+            datasets: [{
+                data: [{{ cash }}, {{ accounts_receivable }}, {{ inventory_value }}],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(0, 123, 255, 0.8)',
+                    'rgba(255, 193, 7, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(40, 167, 69, 1)',
+                    'rgba(0, 123, 255, 1)',
+                    'rgba(255, 193, 7, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return label + ': $' + value.toLocaleString() + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Liabilities & Equity Chart
+    const liabilitiesCtx = document.getElementById('liabilitiesChart').getContext('2d');
+    new Chart(liabilitiesCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Accounts Payable', 'Retained Earnings'],
+            datasets: [{
+                data: [{{ accounts_payable }}, {{ retained_earnings }}],
+                backgroundColor: [
+                    'rgba(220, 53, 69, 0.8)',
+                    'rgba(23, 162, 184, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(220, 53, 69, 1)',
+                    'rgba(23, 162, 184, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return label + ': $' + value.toLocaleString() + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

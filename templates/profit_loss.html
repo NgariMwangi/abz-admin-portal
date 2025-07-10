@@ -1,0 +1,371 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Profit & Loss Statement</h3>
+        <h6 class="op-7 mb-2">Financial performance overview</h6>
+      </div>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Date Range</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <form method="GET" action="{{ url_for('profit_loss') }}" class="row g-3">
+              <div class="col-md-4">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}" required>
+              </div>
+              <div class="col-md-4">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}" required>
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                  <i class="fas fa-filter"></i> Apply
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="setCurrentMonth()">
+                  <i class="fas fa-calendar"></i> Current Month
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-dollar-sign"></i>
+            </div>
+            <h4 class="card-title text-success">${{ "%.2f"|format(total_revenue) }}</h4>
+            <p class="card-category">Total Revenue</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-danger bubble-shadow-small mb-3">
+              <i class="fas fa-shopping-cart"></i>
+            </div>
+            <h4 class="card-title text-danger">${{ "%.2f"|format(total_cogs) }}</h4>
+            <p class="card-category">Cost of Goods Sold</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <h4 class="card-title text-primary">${{ "%.2f"|format(gross_profit) }}</h4>
+            <p class="card-category">Gross Profit</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+              <i class="fas fa-percentage"></i>
+            </div>
+            <h4 class="card-title text-info">{{ "%.1f"|format(profit_margin) }}%</h4>
+            <p class="card-category">Profit Margin</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profit & Loss Statement -->
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Profit & Loss Statement</div>
+              <div class="card-tools">
+                <span class="badge badge-primary">{{ start_date }} to {{ end_date }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-borderless">
+                <tbody>
+                  <tr class="border-bottom">
+                    <td class="fw-bold">Revenue</td>
+                    <td class="text-end fw-bold text-success">${{ "%.2f"|format(total_revenue) }}</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Sales Revenue</td>
+                    <td class="text-end">${{ "%.2f"|format(total_revenue) }}</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="fw-bold">Cost of Goods Sold</td>
+                    <td class="text-end fw-bold text-danger">(${{ "%.2f"|format(total_cogs) }})</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Inventory Costs</td>
+                    <td class="text-end">(${{ "%.2f"|format(total_cogs) }})</td>
+                  </tr>
+                  <tr class="border-bottom border-2">
+                    <td class="fw-bold fs-5">Gross Profit</td>
+                    <td class="text-end fw-bold fs-5 text-primary">${{ "%.2f"|format(gross_profit) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Operating Expenses</td>
+                    <td class="text-end fw-bold text-danger">($0.00)</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Rent & Utilities</td>
+                    <td class="text-end">($0.00)</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Salaries & Wages</td>
+                    <td class="text-end">($0.00)</td>
+                  </tr>
+                  <tr class="border-bottom">
+                    <td class="ps-4">Marketing & Advertising</td>
+                    <td class="text-end">($0.00)</td>
+                  </tr>
+                  <tr class="border-bottom border-2">
+                    <td class="fw-bold fs-5">Net Profit</td>
+                    <td class="text-end fw-bold fs-5 text-success">${{ "%.2f"|format(gross_profit) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Order Statistics</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <small class="text-muted">Total Orders</small>
+              <div class="fw-bold fs-4">{{ total_orders }}</div>
+            </div>
+            <div class="mb-3">
+              <small class="text-muted">Paid Orders</small>
+              <div class="fw-bold fs-4 text-success">{{ paid_orders }}</div>
+            </div>
+            <div class="mb-3">
+              <small class="text-muted">Payment Rate</small>
+              <div class="fw-bold fs-4 text-info">
+                {{ "%.1f"|format((paid_orders / total_orders * 100) if total_orders > 0 else 0) }}%
+              </div>
+            </div>
+            <div class="mb-3">
+              <small class="text-muted">Average Order Value</small>
+              <div class="fw-bold fs-4 text-primary">
+                ${{ "%.2f"|format((total_revenue / paid_orders) if paid_orders > 0 else 0) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Selling Products -->
+    <div class="row mt-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Top Selling Products</div>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if top_products %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Quantity Sold</th>
+                    <th>Revenue</th>
+                    <th>% of Total Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for product in top_products %}
+                  <tr>
+                    <td>
+                      <div class="fw-bold">{{ product.name }}</div>
+                    </td>
+                    <td>
+                      <span class="badge badge-light fs-6">{{ product.total_quantity }}</span>
+                    </td>
+                    <td>
+                      <strong>${{ "%.2f"|format(product.total_revenue) }}</strong>
+                    </td>
+                    <td>
+                      <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-primary" role="progressbar" 
+                             style="width: {{ (product.total_revenue / total_revenue * 100) if total_revenue > 0 else 0 }}%">
+                          {{ "%.1f"|format((product.total_revenue / total_revenue * 100) if total_revenue > 0 else 0) }}%
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No sales data</h5>
+              <p class="text-muted">No products were sold in the selected period.</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Revenue Breakdown</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <canvas id="revenueChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Profit Analysis</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <canvas id="profitChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setCurrentMonth() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    document.getElementById('start_date').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('end_date').value = lastDay.toISOString().split('T')[0];
+}
+
+// Charts
+document.addEventListener('DOMContentLoaded', function() {
+    // Revenue vs COGS Chart
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(revenueCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Revenue', 'COGS'],
+            datasets: [{
+                label: 'Amount ($)',
+                data: [{{ total_revenue }}, {{ total_cogs }}],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(220, 53, 69, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(40, 167, 69, 1)',
+                    'rgba(220, 53, 69, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Profit Margin Chart
+    const profitCtx = document.getElementById('profitChart').getContext('2d');
+    new Chart(profitCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Gross Profit', 'COGS'],
+            datasets: [{
+                data: [{{ gross_profit }}, {{ total_cogs }}],
+                backgroundColor: [
+                    'rgba(0, 123, 255, 0.8)',
+                    'rgba(220, 53, 69, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(0, 123, 255, 1)',
+                    'rgba(220, 53, 69, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return label + ': $' + value.toLocaleString() + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

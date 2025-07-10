@@ -1,0 +1,165 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Add New User</h3>
+        <h6 class="op-7 mb-2">Create a new user account</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('users') }}" class="btn btn-label-info btn-round me-2">
+          <i class="fas fa-users"></i> View All Users
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">User Information</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <form method="POST" action="{{ url_for('add_user') }}">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label for="firstname">First Name *</label>
+                    <input type="text" class="form-control" id="firstname" name="firstname" required>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label for="lastname">Last Name *</label>
+                    <input type="text" class="form-control" id="lastname" name="lastname" required>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" class="form-control" id="email" name="email" required>
+                <small class="form-text text-muted">This will be used as the login username</small>
+              </div>
+              
+              <div class="form-group">
+                <label for="password">Password *</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+                <small class="form-text text-muted">Minimum 6 characters recommended</small>
+              </div>
+              
+              <div class="form-group">
+                <label for="role">Role *</label>
+                <select class="form-control" id="role" name="role" required>
+                  <option value="">Select a role</option>
+                  <option value="admin">Admin</option>
+                  <option value="sales">Sales</option>
+                  <option value="customer">Customer</option>
+                </select>
+                <small class="form-text text-muted">
+                  <strong>Admin:</strong> Full access to all features<br>
+                  <strong>Sales:</strong> Can manage products and view orders<br>
+                  <strong>Customer:</strong> Can place orders and view their history
+                </small>
+              </div>
+              
+              <div class="form-group">
+                <button type="submit" class="btn btn-primary btn-round">
+                  <i class="fas fa-plus"></i> Add User
+                </button>
+                <a href="{{ url_for('users') }}" class="btn btn-secondary btn-round">
+                  <i class="fas fa-times"></i> Cancel
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Role Permissions</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <h6 class="text-primary"><i class="fas fa-shield-alt"></i> Admin</h6>
+              <ul class="list-unstyled small">
+                <li><i class="fas fa-check text-success"></i> Full system access</li>
+                <li><i class="fas fa-check text-success"></i> User management</li>
+                <li><i class="fas fa-check text-success"></i> Product management</li>
+                <li><i class="fas fa-check text-success"></i> Order management</li>
+                <li><i class="fas fa-check text-success"></i> System settings</li>
+              </ul>
+            </div>
+            
+            <div class="mb-3">
+              <h6 class="text-info"><i class="fas fa-chart-line"></i> Sales</h6>
+              <ul class="list-unstyled small">
+                <li><i class="fas fa-check text-success"></i> Product management</li>
+                <li><i class="fas fa-check text-success"></i> Order processing</li>
+                <li><i class="fas fa-check text-success"></i> Stock management</li>
+                <li><i class="fas fa-times text-danger"></i> User management</li>
+                <li><i class="fas fa-times text-danger"></i> System settings</li>
+              </ul>
+            </div>
+            
+            <div class="mb-3">
+              <h6 class="text-warning"><i class="fas fa-user"></i> Customer</h6>
+              <ul class="list-unstyled small">
+                <li><i class="fas fa-check text-success"></i> Place orders</li>
+                <li><i class="fas fa-check text-success"></i> View order history</li>
+                <li><i class="fas fa-check text-success"></i> View products</li>
+                <li><i class="fas fa-times text-danger"></i> Product management</li>
+                <li><i class="fas fa-times text-danger"></i> Admin features</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const form = document.querySelector('form');
+    const password = document.getElementById('password');
+    
+    form.addEventListener('submit', function(e) {
+        if (password.value.length < 6) {
+            e.preventDefault();
+            alert('Password must be at least 6 characters long.');
+            password.focus();
+        }
+    });
+    
+    // Real-time password strength indicator
+    password.addEventListener('input', function() {
+        const strength = this.value.length;
+        const feedback = this.parentNode.querySelector('.form-text');
+        
+        if (strength < 6) {
+            feedback.className = 'form-text text-danger';
+            feedback.textContent = 'Password is too short (minimum 6 characters)';
+        } else if (strength < 8) {
+            feedback.className = 'form-text text-warning';
+            feedback.textContent = 'Password strength: Weak';
+        } else if (strength < 10) {
+            feedback.className = 'form-text text-info';
+            feedback.textContent = 'Password strength: Medium';
+        } else {
+            feedback.className = 'form-text text-success';
+            feedback.textContent = 'Password strength: Strong';
+        }
+    });
+});
+</script>
+{% endblock %} 

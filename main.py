@@ -11,9 +11,9 @@ import cloudinary.api
 from werkzeug.utils import secure_filename
 import os
 from config import Config
+from werkzeug.security import generate_password_hash, check_password_hash
 
-db = SQLAlchemy()
-from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction
+from extensions import db
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -32,6 +32,9 @@ db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login_post'
+
+# Import models after db is initialized
+from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -187,43 +190,55 @@ def products():
                          selected_branch_id=selected_branch_id,
                          pagination=pagination)
 
-@app.route('/add_category', methods=['POST'])
+@app.route('/add_category', methods=['GET', 'POST'])
 @login_required
 @role_required(['admin'])
 def add_category():
-    name = request.form.get('name')
-    description = request.form.get('description')
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        
+        if not name:
+            flash('Category name is required', 'error')
+            return redirect(url_for('add_category'))
+        
+        # Check if category name already exists
+        existing_category = Category.query.filter_by(name=name).first()
+        if existing_category:
+            flash('Category name already exists. Please use a different name.', 'error')
+            return redirect(url_for('add_category'))
+        
+        new_category = Category(name=name, description=description)
+        db.session.add(new_category)
+        db.session.commit()
+        
+        flash('Category added successfully', 'success')
+        return redirect(url_for('categories'))
     
-    if not name:
-        flash('Category name is required', 'error')
-        return redirect(url_for('products'))
-    
-    new_category = Category(name=name, description=description)
-    db.session.add(new_category)
-    db.session.commit()
-    
-    flash('Category added successfully', 'success')
-    return redirect(url_for('products'))
+    return render_template('add_category.html')
 
-@app.route('/edit_category/<int:id>', methods=['POST'])
+@app.route('/edit_category/<int:id>', methods=['GET', 'POST'])
 @login_required
 @role_required(['admin'])
 def edit_category(id):
     category = Category.query.get_or_404(id)
-    
-    name = request.form.get('name')
-    description = request.form.get('description')
-    
-    if not name:
-        flash('Category name is required', 'error')
-        return redirect(url_for('products'))
-    
-    category.name = name
-    category.description = description
-    db.session.commit()
-    
-    flash('Category updated successfully', 'success')
-    return redirect(url_for('products'))
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        if not name:
+            flash('Category name is required', 'error')
+            return redirect(url_for('edit_category', id=id))
+        # Check if category name already exists (excluding current category)
+        existing_category = Category.query.filter_by(name=name).first()
+        if existing_category and existing_category.id != id:
+            flash('Category name already exists. Please use a different name.', 'error')
+            return redirect(url_for('edit_category', id=id))
+        category.name = name
+        category.description = description
+        db.session.commit()
+        flash('Category updated successfully', 'success')
+        return redirect(url_for('categories'))
+    return render_template('edit_category.html', category=category)
 
 @app.route('/delete_category/<int:id>', methods=['POST'])
 @login_required
@@ -231,25 +246,21 @@ def edit_category(id):
 def delete_category(id):
     try:
         category = Category.query.get_or_404(id)
-        
-        # Check if category has products
         if category.products:
             flash('Cannot delete category with associated products', 'error')
-            return redirect(url_for('products'))
-        
+            return redirect(url_for('categories'))
         db.session.delete(category)
         db.session.commit()
-        
         flash('Category deleted successfully', 'success')
-        return redirect(url_for('products'))
+        return redirect(url_for('categories'))
     except IntegrityError as e:
         db.session.rollback()
         flash('Cannot delete this category. It has associated products or other related records.', 'error')
-        return redirect(url_for('products'))
+        return redirect(url_for('categories'))
     except Exception as e:
         db.session.rollback()
         flash('An error occurred while deleting the category. Please try again.', 'error')
-        return redirect(url_for('products'))
+        return redirect(url_for('categories'))
 
 # Products Routes
 @app.route('/add_product', methods=['POST'])
@@ -503,18 +514,692 @@ def toggle_display(product_id):
         flash('An error occurred while updating product display status', 'error')
         return redirect(url_for('products'))
 
+# User Management Routes
+@app.route('/users')
+@login_required
+@role_required(['admin'])
+def users():
+    try:
+        print("Users route accessed")
+        # Pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Get all users with pagination
+        pagination = User.query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        print(f"Pagination object: {pagination}")
+        users = pagination.items
+        print(f"Users found: {len(users)}")
+        
+        return render_template('users.html', users=users, pagination=pagination)
+    except Exception as e:
+        print(f"Error in users route: {e}")
+        db.session.rollback()
+        flash('An error occurred while loading users. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/add_user', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_user():
+    if request.method == 'POST':
+        # Get form data
+        email = request.form.get('email')
+        firstname = request.form.get('firstname')
+        lastname = request.form.get('lastname')
+        password = request.form.get('password')
+        role = request.form.get('role')
+        
+        # Basic validation
+        if not email or not firstname or not lastname or not password or not role:
+            flash('All fields are required', 'error')
+            return redirect(url_for('add_user'))
+        
+        # Check if email already exists
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('Email already exists. Please use a different email.', 'error')
+            return redirect(url_for('add_user'))
+        
+        # Create new user
+        new_user = User(
+            email=email,
+            firstname=firstname,
+            lastname=lastname,
+            password=password,  # In production, you should hash this password
+            role=role
+        )
+        
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            flash('User added successfully', 'success')
+            return redirect(url_for('users'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while adding the user. Please try again.', 'error')
+            return redirect(url_for('add_user'))
+    
+    return render_template('add_user.html')
+
+@app.route('/edit_user/<int:id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_user(id):
+    user = User.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        # Get form data
+        email = request.form.get('email')
+        firstname = request.form.get('firstname')
+        lastname = request.form.get('lastname')
+        password = request.form.get('password')
+        role = request.form.get('role')
+        
+        # Basic validation
+        if not email or not firstname or not lastname or not role:
+            flash('Email, First Name, Last Name, and Role are required', 'error')
+            return redirect(url_for('edit_user', id=id))
+        
+        # Check if email already exists (excluding current user)
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user and existing_user.id != id:
+            flash('Email already exists. Please use a different email.', 'error')
+            return redirect(url_for('edit_user', id=id))
+        
+        # Update user
+        user.email = email
+        user.firstname = firstname
+        user.lastname = lastname
+        user.role = role
+        
+        # Update password only if provided
+        if password:
+            user.password = password  # In production, you should hash this password
+        
+        try:
+            db.session.commit()
+            flash('User updated successfully', 'success')
+            return redirect(url_for('users'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating the user. Please try again.', 'error')
+            return redirect(url_for('edit_user', id=id))
+    
+    return render_template('edit_user.html', user=user)
+
+@app.route('/delete_user/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_user(id):
+    try:
+        user = User.query.get_or_404(id)
+        
+        # Prevent deleting the current user
+        if user.id == current_user.id:
+            flash('You cannot delete your own account.', 'error')
+            return redirect(url_for('users'))
+        
+        # Check if user has related records
+        if user.orders or user.stock_transactions or user.payments:
+            flash('Cannot delete this user. They have associated orders, stock transactions, or payments.', 'error')
+            return redirect(url_for('users'))
+        
+        db.session.delete(user)
+        db.session.commit()
+        
+        flash('User deleted successfully', 'success')
+        return redirect(url_for('users'))
+    except IntegrityError as e:
+        db.session.rollback()
+        flash('Cannot delete this user. They have associated data that prevents deletion.', 'error')
+        return redirect(url_for('users'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the user. Please try again.', 'error')
+        return redirect(url_for('users'))
+
+# Orders Routes
+@app.route('/orders')
+@login_required
+@role_required(['admin'])
+def orders():
+    try:
+        print("Orders route accessed")
+        # Pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Filter parameters
+        status_filter = request.args.get('status', '')
+        payment_filter = request.args.get('payment_status', '')
+        branch_filter = request.args.get('branch_id', type=int)
+        
+        # Base query with joins
+        base_query = db.session.query(Order).join(User).join(OrderType).join(Branch)
+        
+        # Apply filters
+        if status_filter:
+            if status_filter == 'approved':
+                base_query = base_query.filter(Order.approvalstatus == True)
+            elif status_filter == 'pending':
+                base_query = base_query.filter(Order.approvalstatus == False)
+        
+        if payment_filter:
+            base_query = base_query.filter(Order.payment_status == payment_filter)
+        
+        if branch_filter:
+            base_query = base_query.filter(Order.branchid == branch_filter)
+        
+        # Order by creation date (newest first)
+        base_query = base_query.order_by(Order.created_at.desc())
+        
+        # Apply pagination
+        pagination = base_query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        orders = pagination.items
+        print(f"Orders found: {len(orders)}")
+        
+        # Get filter options
+        branches = Branch.query.all()
+        
+        return render_template('orders.html', 
+                             orders=orders, 
+                             pagination=pagination,
+                             branches=branches,
+                             status_filter=status_filter,
+                             payment_filter=payment_filter,
+                             branch_filter=branch_filter)
+    except Exception as e:
+        print(f"Error in orders route: {e}")
+        db.session.rollback()
+        flash('An error occurred while loading orders. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/order_details/<int:order_id>')
+@login_required
+@role_required(['admin'])
+def order_details(order_id):
+    try:
+        order = Order.query.get_or_404(order_id)
+        
+        # Calculate order total
+        total_amount = 0
+        for item in order.order_items:
+            if item.product and item.product.sellingprice:
+                total_amount += item.product.sellingprice * item.quantity
+        
+        return render_template('order_details.html', order=order, total_amount=total_amount)
+    except Exception as e:
+        print(f"Error in order details route: {e}")
+        flash('An error occurred while loading order details.', 'error')
+        return redirect(url_for('orders'))
+
+@app.route('/approve_order/<int:order_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def approve_order(order_id):
+    try:
+        order = Order.query.get_or_404(order_id)
+        order.approvalstatus = True
+        order.approved_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash(f'Order #{order.id} has been approved successfully.', 'success')
+        return redirect(url_for('orders'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while approving the order.', 'error')
+        return redirect(url_for('orders'))
+
+@app.route('/reject_order/<int:order_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def reject_order(order_id):
+    try:
+        order = Order.query.get_or_404(order_id)
+        order.approvalstatus = False
+        order.approved_at = None
+        db.session.commit()
+        
+        flash(f'Order #{order.id} has been rejected.', 'success')
+        return redirect(url_for('orders'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while rejecting the order.', 'error')
+        return redirect(url_for('orders'))
+
+# Profit & Loss Routes
+@app.route('/profit_loss')
+@login_required
+@role_required(['admin'])
+def profit_loss():
+    try:
+        # Get date range from query parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # Default to current month if no dates provided
+        if not start_date:
+            start_date = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Convert to datetime objects
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Calculate Revenue (from completed orders)
+        revenue_query = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.sellingprice)
+        ).join(Product).join(Order).filter(
+            Order.payment_status == 'paid',
+            Order.created_at >= start_dt,
+            Order.created_at <= end_dt
+        )
+        total_revenue = revenue_query.scalar() or 0
+        
+        # Calculate Cost of Goods Sold (COGS)
+        cogs_query = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.buyingprice)
+        ).join(Product).join(Order).filter(
+            Order.payment_status == 'paid',
+            Order.created_at >= start_dt,
+            Order.created_at <= end_dt
+        )
+        total_cogs = cogs_query.scalar() or 0
+        
+        # Calculate Gross Profit
+        gross_profit = total_revenue - total_cogs
+        
+        # Get order statistics
+        total_orders = Order.query.filter(
+            Order.created_at >= start_dt,
+            Order.created_at <= end_dt
+        ).count()
+        
+        paid_orders = Order.query.filter(
+            Order.payment_status == 'paid',
+            Order.created_at >= start_dt,
+            Order.created_at <= end_dt
+        ).count()
+        
+        # Get top selling products
+        top_products = db.session.query(
+            Product.name,
+            db.func.sum(OrderItem.quantity).label('total_quantity'),
+            db.func.sum(OrderItem.quantity * Product.sellingprice).label('total_revenue')
+        ).join(OrderItem).join(Order).filter(
+            Order.payment_status == 'paid',
+            Order.created_at >= start_dt,
+            Order.created_at <= end_dt
+        ).group_by(Product.id, Product.name).order_by(
+            db.func.sum(OrderItem.quantity).desc()
+        ).limit(10).all()
+        
+        # Calculate profit margin
+        profit_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0
+        
+        return render_template('profit_loss.html',
+                             start_date=start_date,
+                             end_date=end_date,
+                             total_revenue=total_revenue,
+                             total_cogs=total_cogs,
+                             gross_profit=gross_profit,
+                             profit_margin=profit_margin,
+                             total_orders=total_orders,
+                             paid_orders=paid_orders,
+                             top_products=top_products)
+    except Exception as e:
+        print(f"Error in profit_loss route: {e}")
+        flash('An error occurred while loading profit & loss data.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/balance_sheet')
+@login_required
+@role_required(['admin'])
+def balance_sheet():
+    try:
+        # Get date as of which to show balance sheet
+        as_of_date = request.args.get('as_of_date')
+        if not as_of_date:
+            as_of_date = datetime.now().strftime('%Y-%m-%d')
+        
+        as_of_dt = datetime.strptime(as_of_date, '%Y-%m-%d')
+        
+        # Calculate Assets
+        # Inventory Value (current stock * buying price)
+        inventory_value = db.session.query(
+            db.func.sum(Product.stock * Product.buyingprice)
+        ).filter(Product.stock > 0).scalar() or 0
+        
+        # Accounts Receivable (pending payments)
+        accounts_receivable = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.sellingprice)
+        ).join(Product).join(Order).filter(
+            Order.payment_status == 'pending',
+            Order.created_at <= as_of_dt
+        ).scalar() or 0
+        
+        # Cash (completed payments)
+        cash = db.session.query(
+            db.func.sum(Payment.amount)
+        ).filter(
+            Payment.payment_status == 'completed',
+            Payment.created_at <= as_of_dt
+        ).scalar() or 0
+        
+        total_assets = inventory_value + accounts_receivable + cash
+        
+        # Calculate Liabilities
+        # Accounts Payable (simplified - could be enhanced with actual supplier data)
+        accounts_payable = 0  # Placeholder for actual supplier payables
+        
+        # Calculate Equity
+        # Retained Earnings (simplified calculation)
+        total_revenue = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.sellingprice)
+        ).join(Product).join(Order).filter(
+            Order.payment_status == 'paid',
+            Order.created_at <= as_of_dt
+        ).scalar() or 0
+        
+        total_cogs = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.buyingprice)
+        ).join(Product).join(Order).filter(
+            Order.payment_status == 'paid',
+            Order.created_at <= as_of_dt
+        ).scalar() or 0
+        
+        retained_earnings = total_revenue - total_cogs
+        
+        total_liabilities_equity = accounts_payable + retained_earnings
+        
+        # Get inventory breakdown by category
+        inventory_by_category = db.session.query(
+            Category.name,
+            db.func.sum(Product.stock * Product.buyingprice).label('value')
+        ).join(Product).filter(Product.stock > 0).group_by(Category.id, Category.name).all()
+        
+        # Get recent transactions
+        recent_transactions = db.session.query(
+            Order, User, Branch
+        ).join(User).join(Branch).filter(
+            Order.created_at <= as_of_dt
+        ).order_by(Order.created_at.desc()).limit(10).all()
+        
+        return render_template('balance_sheet.html',
+                             as_of_date=as_of_date,
+                             inventory_value=inventory_value,
+                             accounts_receivable=accounts_receivable,
+                             cash=cash,
+                             total_assets=total_assets,
+                             accounts_payable=accounts_payable,
+                             retained_earnings=retained_earnings,
+                             total_liabilities_equity=total_liabilities_equity,
+                             inventory_by_category=inventory_by_category,
+                             recent_transactions=recent_transactions)
+    except Exception as e:
+        print(f"Error in balance_sheet route: {e}")
+        flash('An error occurred while loading balance sheet data.', 'error')
+        return redirect(url_for('index'))
+
+# Branch Management Routes
+@app.route('/branches')
+@login_required
+@role_required(['admin'])
+def branches():
+    try:
+        print("Branches route accessed")
+        # Pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Get all branches with pagination
+        pagination = Branch.query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        branches = pagination.items
+        print(f"Branches found: {len(branches)}")
+        
+        return render_template('branches.html', branches=branches, pagination=pagination)
+    except Exception as e:
+        print(f"Error in branches route: {e}")
+        db.session.rollback()
+        flash('An error occurred while loading branches. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/add_branch', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_branch():
+    if request.method == 'POST':
+        # Get form data
+        name = request.form.get('name')
+        location = request.form.get('location')
+        
+        # Basic validation
+        if not name or not location:
+            flash('Branch name and location are required', 'error')
+            return redirect(url_for('add_branch'))
+        
+        # Check if branch name already exists
+        existing_branch = Branch.query.filter_by(name=name).first()
+        if existing_branch:
+            flash('Branch name already exists. Please use a different name.', 'error')
+            return redirect(url_for('add_branch'))
+        
+        # Create new branch
+        new_branch = Branch(
+            name=name,
+            location=location
+        )
+        
+        try:
+            db.session.add(new_branch)
+            db.session.commit()
+            flash('Branch added successfully', 'success')
+            return redirect(url_for('branches'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while adding the branch. Please try again.', 'error')
+            return redirect(url_for('add_branch'))
+    
+    return render_template('add_branch.html')
+
+@app.route('/edit_branch/<int:id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_branch(id):
+    branch = Branch.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        # Get form data
+        name = request.form.get('name')
+        location = request.form.get('location')
+        
+        # Basic validation
+        if not name or not location:
+            flash('Branch name and location are required', 'error')
+            return redirect(url_for('edit_branch', id=id))
+        
+        # Check if branch name already exists (excluding current branch)
+        existing_branch = Branch.query.filter_by(name=name).first()
+        if existing_branch and existing_branch.id != id:
+            flash('Branch name already exists. Please use a different name.', 'error')
+            return redirect(url_for('edit_branch', id=id))
+        
+        # Update branch
+        branch.name = name
+        branch.location = location
+        
+        try:
+            db.session.commit()
+            flash('Branch updated successfully', 'success')
+            return redirect(url_for('branches'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating the branch. Please try again.', 'error')
+            return redirect(url_for('edit_branch', id=id))
+    
+    return render_template('edit_branch.html', branch=branch)
+
+@app.route('/delete_branch/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_branch(id):
+    try:
+        branch = Branch.query.get_or_404(id)
+        
+        # Check if branch has related records
+        if branch.products or branch.orders:
+            flash('Cannot delete this branch. It has associated products or orders.', 'error')
+            return redirect(url_for('branches'))
+        
+        db.session.delete(branch)
+        db.session.commit()
+        
+        flash('Branch deleted successfully', 'success')
+        return redirect(url_for('branches'))
+    except IntegrityError as e:
+        db.session.rollback()
+        flash('Cannot delete this branch. It has associated data that prevents deletion.', 'error')
+        return redirect(url_for('branches'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the branch. Please try again.', 'error')
+        return redirect(url_for('branches'))
+
+@app.route('/branch_details/<int:branch_id>')
+@login_required
+@role_required(['admin'])
+def branch_details(branch_id):
+    try:
+        branch = Branch.query.get_or_404(branch_id)
+        
+        # Get branch statistics
+        total_products = Product.query.filter_by(branchid=branch_id).count()
+        total_orders = Order.query.filter_by(branchid=branch_id).count()
+        
+        # Get recent orders for this branch
+        recent_orders = Order.query.filter_by(branchid=branch_id).order_by(Order.created_at.desc()).limit(10).all()
+        
+        # Get products in this branch
+        products = Product.query.filter_by(branchid=branch_id).all()
+        
+        # Calculate branch revenue
+        branch_revenue = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.sellingprice)
+        ).join(Product).join(Order).filter(
+            Order.branchid == branch_id,
+            Order.payment_status == 'paid'
+        ).scalar() or 0
+        
+        return render_template('branch_details.html', 
+                             branch=branch,
+                             total_products=total_products,
+                             total_orders=total_orders,
+                             recent_orders=recent_orders,
+                             products=products,
+                             branch_revenue=branch_revenue)
+    except Exception as e:
+        print(f"Error in branch details route: {e}")
+        flash('An error occurred while loading branch details.', 'error')
+        return redirect(url_for('branches'))
+
+# Category Management Routes
+@app.route('/categories')
+@login_required
+@role_required(['admin'])
+def categories():
+    try:
+        print("Categories route accessed")
+        # Pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Get all categories with pagination
+        pagination = Category.query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        categories = pagination.items
+        print(f"Categories found: {len(categories)}")
+        
+        return render_template('categories.html', categories=categories, pagination=pagination)
+    except Exception as e:
+        print(f"Error in categories route: {e}")
+        db.session.rollback()
+        flash('An error occurred while loading categories. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/category_details/<int:category_id>')
+@login_required
+@role_required(['admin'])
+def category_details(category_id):
+    try:
+        category = Category.query.get_or_404(category_id)
+        
+        # Get category statistics
+        total_products = Product.query.filter_by(categoryid=category_id).count()
+        
+        # Get products in this category
+        products = Product.query.filter_by(categoryid=category_id).all()
+        
+        # Calculate category revenue
+        category_revenue = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.sellingprice)
+        ).join(Product).join(Order).filter(
+            Product.categoryid == category_id,
+            Order.payment_status == 'paid'
+        ).scalar() or 0
+        
+        # Get products by branch
+        products_by_branch = db.session.query(
+            Branch.name,
+            db.func.count(Product.id).label('product_count')
+        ).join(Product).filter(
+            Product.categoryid == category_id
+        ).group_by(Branch.id, Branch.name).all()
+        
+        return render_template('category_details.html', 
+                             category=category,
+                             total_products=total_products,
+                             products=products,
+                             category_revenue=category_revenue,
+                             products_by_branch=products_by_branch)
+    except Exception as e:
+        print(f"Error in category details route: {e}")
+        flash('An error occurred while loading category details.', 'error')
+        return redirect(url_for('categories'))
+
 # Error handlers
 @app.errorhandler(IntegrityError)
 def handle_integrity_error(error):
     db.session.rollback()
     flash('Cannot perform this action. The record has associated data that prevents deletion.', 'error')
-    return redirect(request.referrer or url_for('products'))
+    # Try to redirect back to the referring page, or to index if no referrer
+    return redirect(request.referrer or url_for('index'))
 
 @app.errorhandler(Exception)
 def handle_general_error(error):
     db.session.rollback()
     flash('An unexpected error occurred. Please try again.', 'error')
-    return redirect(request.referrer or url_for('products'))
+    # Try to redirect back to the referring page, or to index if no referrer
+    return redirect(request.referrer or url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True)

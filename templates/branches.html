@@ -1,0 +1,300 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Branch Management</h3>
+        <h6 class="op-7 mb-2">Manage system branches and locations</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('add_branch') }}" class="btn btn-primary btn-round">
+          <i class="fas fa-plus"></i> Add New Branch
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">All Branches</div>
+              <div class="card-tools">
+                <span class="badge badge-primary">{{ branches|length }} branches</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if branches %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Branch Name</th>
+                    <th>Location</th>
+                    <th>Products</th>
+                    <th>Orders</th>
+                    <th>Revenue</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for branch in branches %}
+                  <tr>
+                    <td>{{ branch.id }}</td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-3">
+                          <span class="text-white fw-bold">{{ branch.name[0] }}</span>
+                        </div>
+                        <div>
+                          <div class="fw-bold">{{ branch.name }}</div>
+                          <small class="text-muted">Branch #{{ branch.id }}</small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div>
+                        <div class="fw-bold">{{ branch.location }}</div>
+                        <small class="text-muted">
+                          <i class="fas fa-map-marker-alt"></i> Location
+                        </small>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="badge badge-info">{{ branch.products|length }} products</span>
+                    </td>
+                    <td>
+                      <span class="badge badge-warning">{{ branch.orders|length }} orders</span>
+                    </td>
+                    <td>
+                      {% set branch_revenue = 0 %}
+                      {% for order in branch.orders %}
+                        {% if order.payment_status == 'paid' %}
+                          {% for item in order.order_items %}
+                            {% if item.product and item.product.sellingprice %}
+                              {% set branch_revenue = branch_revenue + (item.product.sellingprice * item.quantity) %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endif %}
+                      {% endfor %}
+                      <strong>${{ "%.2f"|format(branch_revenue) }}</strong>
+                    </td>
+                    <td>
+                      <div class="btn-group" role="group">
+                        <a href="{{ url_for('branch_details', branch_id=branch.id) }}" class="btn btn-sm btn-outline-info" title="View Details">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{{ url_for('edit_branch', id=branch.id) }}" class="btn btn-sm btn-outline-primary" title="Edit Branch">
+                          <i class="fas fa-edit"></i>
+                        </a>
+                        {% if not branch.products and not branch.orders %}
+                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                onclick="confirmDelete({{ branch.id }}, '{{ branch.name }}')" 
+                                title="Delete Branch">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled 
+                                title="Cannot delete branch with associated data">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Branch pagination">
+              <ul class="pagination justify-content-center">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('branches', page=pagination.prev_num) }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                  </a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in pagination.iter_pages() %}
+                  {% if page_num %}
+                    {% if page_num != pagination.page %}
+                    <li class="page-item">
+                      <a class="page-link" href="{{ url_for('branches', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ page_num }}</span>
+                    </li>
+                    {% endif %}
+                  {% else %}
+                    <li class="page-item disabled">
+                      <span class="page-link">...</span>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('branches', page=pagination.next_num) }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                  </a>
+                </li>
+                {% endif %}
+              </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+              <i class="fas fa-building fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No branches found</h5>
+              <p class="text-muted">Get started by adding your first branch.</p>
+              <a href="{{ url_for('add_branch') }}" class="btn btn-primary btn-round">
+                <i class="fas fa-plus"></i> Add First Branch
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Branch Summary Cards -->
+    <div class="row mt-4">
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+              <i class="fas fa-building"></i>
+            </div>
+            <h4 class="card-title">{{ branches|length }}</h4>
+            <p class="card-category">Total Branches</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+              <i class="fas fa-box"></i>
+            </div>
+            <h4 class="card-title">
+              {% set total_products = 0 %}
+              {% for branch in branches %}
+                {% set total_products = total_products + branch.products|length %}
+              {% endfor %}
+              {{ total_products }}
+            </h4>
+            <p class="card-category">Total Products</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+              <i class="fas fa-shopping-cart"></i>
+            </div>
+            <h4 class="card-title">
+              {% set total_orders = 0 %}
+              {% for branch in branches %}
+                {% set total_orders = total_orders + branch.orders|length %}
+              {% endfor %}
+              {{ total_orders }}
+            </h4>
+            <p class="card-category">Total Orders</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-dollar-sign"></i>
+            </div>
+            <h4 class="card-title">
+              {% set total_revenue = 0 %}
+              {% for branch in branches %}
+                {% for order in branch.orders %}
+                  {% if order.payment_status == 'paid' %}
+                    {% for item in order.order_items %}
+                      {% if item.product and item.product.sellingprice %}
+                        {% set total_revenue = total_revenue + (item.product.sellingprice * item.quantity) %}
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+              ${{ "%.0f"|format(total_revenue) }}
+            </h4>
+            <p class="card-category">Total Revenue</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete branch <strong id="deleteBranchName"></strong>?</p>
+        <p class="text-danger"><small>This action cannot be undone.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-danger">Delete Branch</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDelete(branchId, branchName) {
+    document.getElementById('deleteBranchName').textContent = branchName;
+    document.getElementById('deleteForm').action = "{{ url_for('delete_branch', id=0) }}".replace('0', branchId);
+    
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    deleteModal.show();
+}
+
+// Add some styling for the avatar
+document.addEventListener('DOMContentLoaded', function() {
+    // Add custom styles for better table appearance
+    const style = document.createElement('style');
+    style.textContent = `
+        .avatar-sm {
+            width: 40px;
+            height: 40px;
+            font-size: 14px;
+        }
+        .table td {
+            vertical-align: middle;
+        }
+        .btn-group .btn {
+            margin-right: 2px;
+        }
+        .badge {
+            font-size: 0.75em;
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
+{% endblock %} 

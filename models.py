@@ -1,4 +1,4 @@
-from main import db
+from extensions import db
 from datetime import datetime
 
 
@@ -7,6 +7,7 @@ class Branch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     location = db.Column(db.String, nullable=False)
+
     products = db.relationship('Product', backref='branch', lazy=True)
     orders = db.relationship('Order', backref='branch', lazy=True)
 
@@ -29,7 +30,7 @@ class User(db.Model):
     password = db.Column(db.String, nullable=False)
     role = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    phone = db.Column(db.String, nullable=True)
+    # phone = db.Column(db.String, nullable=True)
     orders = db.relationship('Order', backref='user', lazy=True)
     stock_transactions = db.relationship('StockTransaction', backref='user', lazy=True)
     payments = db.relationship('Payment', backref='user', lazy=True)
