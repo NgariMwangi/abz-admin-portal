@@ -5,12 +5,12 @@
   <div class="page-inner">
     <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
       <div>
-        <h3 class="fw-bold mb-3">Category Management</h3>
-        <h6 class="op-7 mb-2">Manage product categories and classifications</h6>
+        <h3 class="fw-bold mb-3">Subcategory Management</h3>
+        <h6 class="op-7 mb-2">Manage product subcategories and classifications</h6>
       </div>
       <div class="ms-md-auto py-2 py-md-0">
-        <a href="{{ url_for('add_category') }}" class="btn btn-primary btn-round">
-          <i class="fas fa-plus"></i> Add New Category
+        <a href="{{ url_for('add_subcategory') }}" class="btn btn-primary btn-round">
+          <i class="fas fa-plus"></i> Add New Subcategory
         </a>
       </div>
     </div>
@@ -20,86 +20,85 @@
         <div class="card card-round">
           <div class="card-header">
             <div class="card-head-row">
-              <div class="card-title">All Categories</div>
+              <div class="card-title">All Subcategories</div>
               <div class="card-tools">
-                <span class="badge badge-primary">{{ categories|length }} categories</span>
+                <span class="badge badge-primary">{{ subcategories|length }} subcategories</span>
               </div>
             </div>
           </div>
           <div class="card-body">
-            {% if categories %}
+            {% if subcategories %}
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Category Name</th>
+                    <th>Image</th>
+                    <th>Name</th>
+                    <th>Parent Category</th>
                     <th>Description</th>
                     <th>Products</th>
-                    <th>Revenue</th>
+                    <th>Created</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {% for category in categories %}
+                  {% for subcategory in subcategories %}
                   <tr>
-                    <td>{{ category.id }}</td>
+                    <td>
+                      {% if subcategory.image_url %}
+                        <img src="{{ subcategory.image_url }}" alt="{{ subcategory.name }}" 
+                             class="img-thumbnail" style="width: 50px; height: 50px; object-fit: cover;">
+                      {% else %}
+                        <div class="bg-light d-flex align-items-center justify-content-center rounded" 
+                             style="width: 50px; height: 50px;">
+                          <i class="fas fa-image text-muted"></i>
+                        </div>
+                      {% endif %}
+                    </td>
                     <td>
                       <div class="d-flex align-items-center">
-                        {% if category.image_url %}
-                          <div class="avatar-sm me-3">
-                            <img src="{{ category.image_url }}" alt="{{ category.name }}" 
-                                 class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
-                          </div>
-                        {% else %}
-                          <div class="avatar-sm bg-info rounded-circle d-flex align-items-center justify-content-center me-3">
-                            <span class="text-white fw-bold">{{ category.name[0] }}</span>
-                          </div>
-                        {% endif %}
+                        <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-3">
+                          <span class="text-white fw-bold">{{ subcategory.name[0] }}</span>
+                        </div>
                         <div>
-                          <div class="fw-bold">{{ category.name }}</div>
-                          <small class="text-muted">Category #{{ category.id }}</small>
+                          <div class="fw-bold">{{ subcategory.name }}</div>
+                          <small class="text-muted">Subcategory #{{ subcategory.id }}</small>
                         </div>
                       </div>
                     </td>
                     <td>
-                      {% if category.description %}
-                        <div>{{ category.description }}</div>
+                      <span class="badge badge-info">{{ subcategory.category.name }}</span>
+                    </td>
+                    <td>
+                      {% if subcategory.description %}
+                        <div>{{ subcategory.description[:50] }}{% if subcategory.description|length > 50 %}...{% endif %}</div>
                       {% else %}
                         <span class="text-muted">No description</span>
                       {% endif %}
                     </td>
                     <td>
-                      <span class="badge badge-info">{{ category.products|length }} products</span>
+                      <span class="badge badge-primary">{{ subcategory.products|length }} products</span>
                     </td>
                     <td>
-                      {% set category_revenue = 0 %}
-                      {% for product in category.products %}
-                        {% for order_item in product.order_items %}
-                          {% if order_item.order.payment_status == 'paid' %}
-                            {% set category_revenue = category_revenue + (product.sellingprice * order_item.quantity) %}
-                          {% endif %}
-                        {% endfor %}
-                      {% endfor %}
-                      <strong>${{ "%.2f"|format(category_revenue) }}</strong>
+                      <small class="text-muted">{{ subcategory.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
                     </td>
                     <td>
                       <div class="btn-group" role="group">
-                        <a href="{{ url_for('category_details', category_id=category.id) }}" class="btn btn-sm btn-outline-info" title="View Details">
+                        <a href="{{ url_for('subcategory_details', subcategory_id=subcategory.id) }}" class="btn btn-sm btn-outline-info" title="View Details">
                           <i class="fas fa-eye"></i>
                         </a>
-                        <a href="{{ url_for('edit_category', id=category.id) }}" class="btn btn-sm btn-outline-primary" title="Edit Category">
+                        <a href="{{ url_for('edit_subcategory', id=subcategory.id) }}" class="btn btn-sm btn-outline-primary" title="Edit Subcategory">
                           <i class="fas fa-edit"></i>
                         </a>
-                        {% if not category.products %}
+                        {% if not subcategory.products %}
                         <button type="button" class="btn btn-sm btn-outline-danger" 
-                                onclick="confirmDelete({{ category.id }}, '{{ category.name }}')" 
-                                title="Delete Category">
+                                onclick="confirmDelete({{ subcategory.id }}, '{{ subcategory.name }}')" 
+                                title="Delete Subcategory">
                           <i class="fas fa-trash"></i>
                         </button>
                         {% else %}
                         <button type="button" class="btn btn-sm btn-outline-secondary" disabled 
-                                title="Cannot delete category with associated products">
+                                title="Cannot delete subcategory with associated products">
                           <i class="fas fa-trash"></i>
                         </button>
                         {% endif %}
@@ -113,11 +112,11 @@
 
             <!-- Pagination -->
             {% if pagination.pages > 1 %}
-            <nav aria-label="Category pagination">
+            <nav aria-label="Subcategory pagination">
               <ul class="pagination justify-content-center">
                 {% if pagination.has_prev %}
                 <li class="page-item">
-                  <a class="page-link" href="{{ url_for('categories', page=pagination.prev_num) }}">
+                  <a class="page-link" href="{{ url_for('subcategories', page=pagination.prev_num) }}">
                     <i class="fas fa-chevron-left"></i> Previous
                   </a>
                 </li>
@@ -127,7 +126,7 @@
                   {% if page_num %}
                     {% if page_num != pagination.page %}
                     <li class="page-item">
-                      <a class="page-link" href="{{ url_for('categories', page=page_num) }}">{{ page_num }}</a>
+                      <a class="page-link" href="{{ url_for('subcategories', page=page_num) }}">{{ page_num }}</a>
                     </li>
                     {% else %}
                     <li class="page-item active">
@@ -143,7 +142,7 @@
                 
                 {% if pagination.has_next %}
                 <li class="page-item">
-                  <a class="page-link" href="{{ url_for('categories', page=pagination.next_num) }}">
+                  <a class="page-link" href="{{ url_for('subcategories', page=pagination.next_num) }}">
                     Next <i class="fas fa-chevron-right"></i>
                   </a>
                 </li>
@@ -154,11 +153,11 @@
 
             {% else %}
             <div class="text-center py-5">
-              <i class="fas fa-tags fa-3x text-muted mb-3"></i>
-              <h5 class="text-muted">No categories found</h5>
-              <p class="text-muted">Get started by adding your first category.</p>
-              <a href="{{ url_for('add_category') }}" class="btn btn-primary btn-round">
-                <i class="fas fa-plus"></i> Add First Category
+              <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No subcategories found</h5>
+              <p class="text-muted">Get started by adding your first subcategory.</p>
+              <a href="{{ url_for('add_subcategory') }}" class="btn btn-primary btn-round">
+                <i class="fas fa-plus"></i> Add First Subcategory
               </a>
             </div>
             {% endif %}
@@ -167,29 +166,48 @@
       </div>
     </div>
 
-    <!-- Category Summary Cards -->
+    <!-- Subcategory Summary Cards -->
     <div class="row mt-4">
       <div class="col-md-3">
         <div class="card card-round">
           <div class="card-body text-center">
-            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
-              <i class="fas fa-tags"></i>
+            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+              <i class="fas fa-folder"></i>
             </div>
-            <h4 class="card-title">{{ categories|length }}</h4>
-            <p class="card-category">Total Categories</p>
+            <h4 class="card-title">{{ subcategories|length }}</h4>
+            <p class="card-category">Total Subcategories</p>
           </div>
         </div>
       </div>
       <div class="col-md-3">
         <div class="card card-round">
           <div class="card-body text-center">
-            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+              <i class="fas fa-tags"></i>
+            </div>
+            <h4 class="card-title">
+              {% set unique_categories = [] %}
+              {% for subcategory in subcategories %}
+                {% if subcategory.category.id not in unique_categories %}
+                  {% set unique_categories = unique_categories + [subcategory.category.id] %}
+                {% endif %}
+              {% endfor %}
+              {{ unique_categories|length }}
+            </h4>
+            <p class="card-category">Parent Categories</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
               <i class="fas fa-box"></i>
             </div>
             <h4 class="card-title">
               {% set total_products = 0 %}
-              {% for category in categories %}
-                {% set total_products = total_products + category.products|length %}
+              {% for subcategory in subcategories %}
+                {% set total_products = total_products + subcategory.products|length %}
               {% endfor %}
               {{ total_products }}
             </h4>
@@ -200,40 +218,21 @@
       <div class="col-md-3">
         <div class="card card-round">
           <div class="card-body text-center">
-            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
-              <i class="fas fa-dollar-sign"></i>
-            </div>
-            <h4 class="card-title">
-              {% set total_revenue = 0 %}
-              {% for category in categories %}
-                {% for product in category.products %}
-                  {% for order_item in product.order_items %}
-                    {% if order_item.order.payment_status == 'paid' %}
-                      {% set total_revenue = total_revenue + (product.sellingprice * order_item.quantity) %}
-                    {% endif %}
-                  {% endfor %}
-                {% endfor %}
-              {% endfor %}
-              ${{ "%.0f"|format(total_revenue) }}
-            </h4>
-            <p class="card-category">Total Revenue</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card card-round">
-          <div class="card-body text-center">
             <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
               <i class="fas fa-chart-bar"></i>
             </div>
             <h4 class="card-title">
-              {% if categories|length > 0 %}
-                {{ "%.1f"|format(total_products / categories|length) }}
+              {% if subcategories|length > 0 %}
+                {% set total_products = 0 %}
+                {% for subcategory in subcategories %}
+                  {% set total_products = total_products + subcategory.products|length %}
+                {% endfor %}
+                {{ "%.1f"|format(total_products / subcategories|length) }}
               {% else %}
                 0
               {% endif %}
             </h4>
-            <p class="card-category">Avg Products/Category</p>
+            <p class="card-category">Avg Products/Subcategory</p>
           </div>
         </div>
       </div>
@@ -250,13 +249,13 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p>Are you sure you want to delete category <strong id="deleteCategoryName"></strong>?</p>
+        <p>Are you sure you want to delete subcategory <strong id="subcategoryName"></strong>?</p>
         <p class="text-danger"><small>This action cannot be undone.</small></p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <form id="deleteForm" method="POST" style="display: inline;">
-          <button type="submit" class="btn btn-danger">Delete Category</button>
+          <button type="submit" class="btn btn-danger">Delete Subcategory</button>
         </form>
       </div>
     </div>
@@ -264,9 +263,9 @@
 </div>
 
 <script>
-function confirmDelete(categoryId, categoryName) {
-    document.getElementById('deleteCategoryName').textContent = categoryName;
-    document.getElementById('deleteForm').action = "{{ url_for('delete_category', id=0) }}".replace('0', categoryId);
+function confirmDelete(subcategoryId, subcategoryName) {
+    document.getElementById('subcategoryName').textContent = subcategoryName;
+    document.getElementById('deleteForm').action = "{{ url_for('delete_subcategory', id=0) }}".replace('0', subcategoryId);
     
     const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
     deleteModal.show();

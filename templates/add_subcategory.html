@@ -1,0 +1,159 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="main-content">
+    <div class="section__content section__content--p30">
+        <div class="container-fluid">
+            <!-- Page Header -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="overview-wrap">
+                        <h2 class="title-1">Add Subcategory</h2>
+                        <a href="{{ url_for('subcategories') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Subcategories
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Add Subcategory Form -->
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Subcategory Information</h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" enctype="multipart/form-data">
+                                <div class="form-group">
+                                    <label for="name">Subcategory Name *</label>
+                                    <input type="text" class="form-control" id="name" name="name" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="category_id">Parent Category *</label>
+                                    <select class="form-control" id="category_id" name="category_id" required>
+                                        <option value="">Select a category</option>
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="description">Description</label>
+                                    <textarea class="form-control" id="description" name="description" rows="3" 
+                                              placeholder="Enter subcategory description (optional)"></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="image">Subcategory Image</label>
+                                    <div class="custom-file">
+                                        <input type="file" class="custom-file-input" id="image" name="image" 
+                                               accept="image/*" onchange="previewImage(this)">
+                                        <label class="custom-file-label" for="image">Choose file</label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        Supported formats: JPG, PNG, GIF, WebP. Max size: 16MB
+                                    </small>
+                                </div>
+
+                                <div class="form-group" id="imagePreview" style="display: none;">
+                                    <label>Image Preview</label>
+                                    <div class="mt-2">
+                                        <img id="preview" src="" alt="Preview" class="img-thumbnail" 
+                                             style="max-width: 200px; max-height: 200px;">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> Add Subcategory
+                                    </button>
+                                    <a href="{{ url_for('subcategories') }}" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Guidelines</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="fas fa-info-circle text-info"></i>
+                                    <strong>Name:</strong> Choose a descriptive name for the subcategory
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-sitemap text-info"></i>
+                                    <strong>Parent Category:</strong> Select the main category this subcategory belongs to
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-image text-info"></i>
+                                    <strong>Image:</strong> Upload an image to represent this subcategory
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-align-left text-info"></i>
+                                    <strong>Description:</strong> Provide additional details about the subcategory
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewImage(input) {
+    const file = input.files[0];
+    const preview = document.getElementById('preview');
+    const previewDiv = document.getElementById('imagePreview');
+    const label = input.nextElementSibling;
+
+    if (file) {
+        // Update file label
+        label.textContent = file.name;
+
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            previewDiv.style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+    } else {
+        label.textContent = 'Choose file';
+        previewDiv.style.display = 'none';
+    }
+}
+
+// Update file input label when file is selected
+document.querySelector('.custom-file-input').addEventListener('change', function(e) {
+    var fileName = e.target.files[0].name;
+    var label = e.target.nextElementSibling;
+    label.textContent = fileName;
+});
+</script>
+{% endblock %} 

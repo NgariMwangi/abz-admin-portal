@@ -1,6 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash
+from datetime import datetime, timezone, timedelta
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -34,7 +34,10 @@ login_manager.init_app(app)
 login_manager.login_view = 'login_post'
 
 # Import models after db is initialized
-from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment
+from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription
+
+# Define EAT timezone
+EAT = timezone(timedelta(hours=3))
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -64,7 +67,84 @@ def role_required(roles):
 def index():
     if not current_user.is_authenticated:
         return redirect(url_for('login_post'))
-    return render_template("index.html")
+    
+    # Get real business data
+    from sqlalchemy import func, and_
+    from datetime import datetime, timedelta
+    
+    # Current date in EAT timezone
+    now = datetime.now(EAT)
+    today = now.date()
+    this_month = now.replace(day=1)
+    last_month = (this_month - timedelta(days=1)).replace(day=1)
+    
+    # Dashboard statistics
+    total_users = User.query.count()
+    total_products = Product.query.count()
+    total_orders = Order.query.count()
+    total_branches = Branch.query.count()
+    
+    # Recent orders (last 7 days)
+    recent_orders = Order.query.filter(
+        Order.created_at >= today - timedelta(days=7)
+    ).count()
+    
+    # Pending orders
+    pending_orders = Order.query.filter_by(approvalstatus=False).count()
+    
+    # Total revenue (from approved orders)
+    total_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+        Order, OrderItem.orderid == Order.id
+    ).filter(Order.approvalstatus == True).scalar() or 0
+    
+    # Monthly revenue
+    monthly_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+        Order, OrderItem.orderid == Order.id
+    ).filter(
+        and_(Order.approvalstatus == True, Order.created_at >= this_month)
+    ).scalar() or 0
+    
+    # Low stock products (less than 10 items)
+    low_stock_products = Product.query.filter(Product.stock < 10).count()
+    
+    # Recent activities
+    recent_orders_list = Order.query.order_by(Order.created_at.desc()).limit(5).all()
+    recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    
+    # Branch statistics
+    branch_stats = []
+    for branch in Branch.query.all():
+        branch_products = Product.query.filter_by(branchid=branch.id).count()
+        branch_orders = Order.query.filter_by(branchid=branch.id).count()
+        branch_stats.append({
+            'branch': branch,
+            'products': branch_products,
+            'orders': branch_orders
+        })
+    
+    # Top selling products
+    top_products = db.session.query(
+        Product, func.sum(OrderItem.quantity).label('total_sold')
+    ).join(OrderItem, Product.id == OrderItem.productid).join(
+        Order, OrderItem.orderid == Order.id
+    ).filter(Order.approvalstatus == True).group_by(Product.id).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(5).all()
+    
+    return render_template("index.html", 
+                         total_users=total_users,
+                         total_products=total_products,
+                         total_orders=total_orders,
+                         total_branches=total_branches,
+                         recent_orders=recent_orders,
+                         pending_orders=pending_orders,
+                         total_revenue=total_revenue,
+                         monthly_revenue=monthly_revenue,
+                         low_stock_products=low_stock_products,
+                         recent_orders_list=recent_orders_list,
+                         recent_users=recent_users,
+                         branch_stats=branch_stats,
+                         top_products=top_products)
 
 @app.route("/login", methods=["GET", "POST"])
 def login_post():
@@ -151,12 +231,19 @@ def delete_from_cloudinary(public_id):
         print(f"Error deleting from Cloudinary: {e}")
         return False
 
+# Context processor to make branches available to all templates
+@app.context_processor
+def inject_branches():
+    branches = Branch.query.all()
+    return dict(branches=branches)
+
 # Categories Routes
 @app.route('/products')
 @login_required
 @role_required(['admin'])
 def products():
     categories = Category.query.all()
+    subcategories = SubCategory.query.all()
     branches = Branch.query.all()
     
     # Get selected branch from query parameter
@@ -166,13 +253,13 @@ def products():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)  # Default 10 items per page
     
-    # Base query
+    # Base query - don't join with Category since Product doesn't have direct relationship
     if selected_branch_id:
         # Filter products by selected branch
-        base_query = Product.query.join(Category).filter(Product.branchid == selected_branch_id)
+        base_query = Product.query.filter(Product.branchid == selected_branch_id)
     else:
         # Show all products if no branch is selected
-        base_query = Product.query.join(Category)
+        base_query = Product.query
     
     # Apply pagination
     pagination = base_query.paginate(
@@ -185,9 +272,44 @@ def products():
     
     return render_template('products.html', 
                          categories=categories, 
+                         subcategories=subcategories,
                          products=products, 
                          branches=branches,
                          selected_branch_id=selected_branch_id,
+                         pagination=pagination)
+
+@app.route('/branch_products/<int:branch_id>')
+@login_required
+@role_required(['admin'])
+def branch_products(branch_id):
+    # Get the specific branch
+    branch = Branch.query.get_or_404(branch_id)
+    categories = Category.query.all()
+    subcategories = SubCategory.query.all()
+    branches = Branch.query.all()
+    
+    # Pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    # Filter products by the specific branch
+    base_query = Product.query.filter(Product.branchid == branch_id)
+    
+    # Apply pagination
+    pagination = base_query.paginate(
+        page=page, 
+        per_page=per_page, 
+        error_out=False
+    )
+    
+    products = pagination.items
+    
+    return render_template('branch_products.html', 
+                         branch=branch,
+                         categories=categories, 
+                         subcategories=subcategories,
+                         products=products, 
+                         branches=branches,
                          pagination=pagination)
 
 @app.route('/add_category', methods=['GET', 'POST'])
@@ -208,7 +330,22 @@ def add_category():
             flash('Category name already exists. Please use a different name.', 'error')
             return redirect(url_for('add_category'))
         
-        new_category = Category(name=name, description=description)
+        # Handle image upload to Cloudinary
+        image_url = None
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                try:
+                    # Upload to Cloudinary
+                    image_url = upload_to_cloudinary(file)
+                    if not image_url:
+                        flash('Failed to upload image. Please try again.', 'error')
+                        return redirect(url_for('add_category'))
+                except Exception as e:
+                    flash(f'Error uploading image: {str(e)}', 'error')
+                    return redirect(url_for('add_category'))
+        
+        new_category = Category(name=name, description=description, image_url=image_url)
         db.session.add(new_category)
         db.session.commit()
         
@@ -233,6 +370,27 @@ def edit_category(id):
         if existing_category and existing_category.id != id:
             flash('Category name already exists. Please use a different name.', 'error')
             return redirect(url_for('edit_category', id=id))
+        
+        # Handle image upload if a new image is provided
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                try:
+                    # Delete old image from Cloudinary if it exists
+                    if category.image_url:
+                        delete_from_cloudinary(category.image_url)
+                    
+                    # Upload new image to Cloudinary
+                    image_url = upload_to_cloudinary(file)
+                    if not image_url:
+                        flash('Failed to upload new image. Please try again.', 'error')
+                        return redirect(url_for('edit_category', id=id))
+                    
+                    category.image_url = image_url
+                except Exception as e:
+                    flash(f'Error uploading image: {str(e)}', 'error')
+                    return redirect(url_for('edit_category', id=id))
+        
         category.name = name
         category.description = description
         db.session.commit()
@@ -269,7 +427,7 @@ def delete_category(id):
 def add_product():
     # Get form data
     name = request.form.get('name')
-    categoryid = request.form.get('categoryid')
+    subcategory_id = request.form.get('subcategory_id')
     branchid = request.form.get('branchid')  # Get branch ID from form
     buyingprice = request.form.get('buyingprice')
     sellingprice = request.form.get('sellingprice')
@@ -277,8 +435,8 @@ def add_product():
     productcode = request.form.get('productcode')
     
     # Basic validation
-    if not name or not categoryid or not branchid:
-        flash('Name, Category, and Branch are required', 'error')
+    if not name or not branchid:
+        flash('Name and Branch are required', 'error')
         return redirect(url_for('products'))
     
     # Handle file upload to Cloudinary
@@ -306,7 +464,7 @@ def add_product():
     
     new_product = Product(
         name=name,
-        categoryid=categoryid,
+        subcategory_id=subcategory_id if subcategory_id else None,
         branchid=branchid,  # Use the selected branch ID
         buyingprice=buyingprice,
         sellingprice=sellingprice,
@@ -322,6 +480,24 @@ def add_product():
     flash('Product added successfully', 'success')
     return redirect(url_for('products'))
 
+@app.route('/get_product/<int:id>')
+@login_required
+@role_required(['admin'])
+def get_product(id):
+    product = Product.query.get_or_404(id)
+    return jsonify({
+        'id': product.id,
+        'name': product.name,
+        'productcode': product.productcode,
+        'subcategory_id': product.subcategory_id,
+        'branchid': product.branchid,
+        'buyingprice': product.buyingprice,
+        'sellingprice': product.sellingprice,
+        'stock': product.stock,
+        'display': product.display,
+        'image_url': product.image_url
+    })
+
 @app.route('/edit_product/<int:id>', methods=['POST'])
 @login_required
 @role_required(['admin'])
@@ -330,7 +506,7 @@ def edit_product(id):
     
     # Get form data
     product.name = request.form.get('name')
-    product.categoryid = request.form.get('categoryid')
+    product.subcategory_id = request.form.get('subcategory_id') if request.form.get('subcategory_id') else None
     product.branchid = request.form.get('branchid')  # Get branch ID from form
     product.buyingprice = int(request.form.get('buyingprice')) if request.form.get('buyingprice') else None
     product.sellingprice = int(request.form.get('sellingprice')) if request.form.get('sellingprice') else None
@@ -341,8 +517,8 @@ def edit_product(id):
     product.display = request.form.get('display') == 'on'
     
     # Basic validation
-    if not product.name or not product.categoryid or not product.branchid:
-        flash('Name, Category, and Branch are required', 'error')
+    if not product.name or not product.branchid:
+        flash('Name and Branch are required', 'error')
         return redirect(url_for('products'))
     
     # Handle file upload if a new image is provided
@@ -750,7 +926,7 @@ def approve_order(order_id):
     try:
         order = Order.query.get_or_404(order_id)
         order.approvalstatus = True
-        order.approved_at = datetime.utcnow()
+        order.approved_at = datetime.now(EAT)
         db.session.commit()
         
         flash(f'Order #{order.id} has been approved successfully.', 'success')
@@ -789,9 +965,9 @@ def profit_loss():
         
         # Default to current month if no dates provided
         if not start_date:
-            start_date = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+            start_date = datetime.now(EAT).replace(day=1).strftime('%Y-%m-%d')
         if not end_date:
-            end_date = datetime.now().strftime('%Y-%m-%d')
+            end_date = datetime.now(EAT).strftime('%Y-%m-%d')
         
         # Convert to datetime objects
         start_dt = datetime.strptime(start_date, '%Y-%m-%d')
@@ -871,7 +1047,7 @@ def balance_sheet():
         # Get date as of which to show balance sheet
         as_of_date = request.args.get('as_of_date')
         if not as_of_date:
-            as_of_date = datetime.now().strftime('%Y-%m-%d')
+            as_of_date = datetime.now(EAT).strftime('%Y-%m-%d')
         
         as_of_dt = datetime.strptime(as_of_date, '%Y-%m-%d')
         
@@ -1153,27 +1329,37 @@ def category_details(category_id):
     try:
         category = Category.query.get_or_404(category_id)
         
-        # Get category statistics
-        total_products = Product.query.filter_by(categoryid=category_id).count()
+        # Get subcategories for this category
+        subcategories = SubCategory.query.filter_by(category_id=category_id).all()
+        subcategory_ids = [sub.id for sub in subcategories]
         
-        # Get products in this category
-        products = Product.query.filter_by(categoryid=category_id).all()
-        
-        # Calculate category revenue
-        category_revenue = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.sellingprice)
-        ).join(Product).join(Order).filter(
-            Product.categoryid == category_id,
-            Order.payment_status == 'paid'
-        ).scalar() or 0
-        
-        # Get products by branch
-        products_by_branch = db.session.query(
-            Branch.name,
-            db.func.count(Product.id).label('product_count')
-        ).join(Product).filter(
-            Product.categoryid == category_id
-        ).group_by(Branch.id, Branch.name).all()
+        # Handle both old and new product structures
+        if subcategory_ids:
+            # New structure: products through subcategories
+            total_products = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).count()
+            products = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).all()
+            
+            # Calculate category revenue
+            category_revenue = db.session.query(
+                db.func.sum(OrderItem.quantity * Product.sellingprice)
+            ).join(Product).join(Order).filter(
+                Product.subcategory_id.in_(subcategory_ids),
+                Order.payment_status == 'paid'
+            ).scalar() or 0
+            
+            # Get products by branch
+            products_by_branch = db.session.query(
+                Branch.name,
+                db.func.count(Product.id).label('product_count')
+            ).join(Product).filter(
+                Product.subcategory_id.in_(subcategory_ids)
+            ).group_by(Branch.id, Branch.name).all()
+        else:
+            # No subcategories yet, show empty state
+            total_products = 0
+            products = []
+            category_revenue = 0
+            products_by_branch = []
         
         return render_template('category_details.html', 
                              category=category,
@@ -1185,6 +1371,326 @@ def category_details(category_id):
         print(f"Error in category details route: {e}")
         flash('An error occurred while loading category details.', 'error')
         return redirect(url_for('categories'))
+
+# Subcategory Management Routes
+@app.route('/subcategories')
+@login_required
+@role_required(['admin'])
+def subcategories():
+    try:
+        # Pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Get all subcategories with pagination
+        pagination = SubCategory.query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        subcategories = pagination.items
+        
+        return render_template('subcategories.html', subcategories=subcategories, pagination=pagination)
+    except Exception as e:
+        print(f"Error in subcategories route: {e}")
+        db.session.rollback()
+        flash('An error occurred while loading subcategories. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/add_subcategory', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_subcategory():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        category_id = request.form.get('category_id')
+        
+        if not name or not category_id:
+            flash('Subcategory name and parent category are required', 'error')
+            return redirect(url_for('add_subcategory'))
+        
+        # Check if subcategory name already exists in the same category
+        existing_subcategory = SubCategory.query.filter_by(
+            name=name, category_id=category_id
+        ).first()
+        if existing_subcategory:
+            flash('Subcategory name already exists in this category. Please use a different name.', 'error')
+            return redirect(url_for('add_subcategory'))
+        
+        # Handle image upload
+        image_url = None
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                try:
+                    image_url = upload_to_cloudinary(file)
+                    if not image_url:
+                        flash('Failed to upload image. Please try again.', 'error')
+                        return redirect(url_for('add_subcategory'))
+                except Exception as e:
+                    flash(f'Error uploading image: {str(e)}', 'error')
+                    return redirect(url_for('add_subcategory'))
+        
+        new_subcategory = SubCategory(
+            name=name,
+            description=description,
+            category_id=category_id,
+            image_url=image_url
+        )
+        
+        try:
+            db.session.add(new_subcategory)
+            db.session.commit()
+            flash('Subcategory added successfully', 'success')
+            return redirect(url_for('subcategories'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while adding the subcategory. Please try again.', 'error')
+            return redirect(url_for('add_subcategory'))
+    
+    # Get all categories for the dropdown
+    categories = Category.query.all()
+    return render_template('add_subcategory.html', categories=categories)
+
+@app.route('/edit_subcategory/<int:id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_subcategory(id):
+    subcategory = SubCategory.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        category_id = request.form.get('category_id')
+        
+        if not name or not category_id:
+            flash('Subcategory name and parent category are required', 'error')
+            return redirect(url_for('edit_subcategory', id=id))
+        
+        # Check if subcategory name already exists in the same category (excluding current)
+        existing_subcategory = SubCategory.query.filter_by(
+            name=name, category_id=category_id
+        ).first()
+        if existing_subcategory and existing_subcategory.id != id:
+            flash('Subcategory name already exists in this category. Please use a different name.', 'error')
+            return redirect(url_for('edit_subcategory', id=id))
+        
+        # Handle image upload
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                try:
+                    # Delete old image if exists
+                    if subcategory.image_url:
+                        delete_from_cloudinary(subcategory.image_url)
+                    
+                    image_url = upload_to_cloudinary(file)
+                    if image_url:
+                        subcategory.image_url = image_url
+                except Exception as e:
+                    flash(f'Error uploading image: {str(e)}', 'error')
+                    return redirect(url_for('edit_subcategory', id=id))
+        
+        # Update subcategory
+        subcategory.name = name
+        subcategory.description = description
+        subcategory.category_id = category_id
+        
+        try:
+            db.session.commit()
+            flash('Subcategory updated successfully', 'success')
+            return redirect(url_for('subcategories'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating the subcategory. Please try again.', 'error')
+            return redirect(url_for('edit_subcategory', id=id))
+    
+    # Get all categories for the dropdown
+    categories = Category.query.all()
+    return render_template('edit_subcategory.html', subcategory=subcategory, categories=categories)
+
+@app.route('/delete_subcategory/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_subcategory(id):
+    try:
+        subcategory = SubCategory.query.get_or_404(id)
+        
+        # Check if subcategory has related products
+        if subcategory.products:
+            flash('Cannot delete this subcategory. It has associated products.', 'error')
+            return redirect(url_for('subcategories'))
+        
+        # Delete image from Cloudinary if exists
+        if subcategory.image_url:
+            delete_from_cloudinary(subcategory.image_url)
+        
+        db.session.delete(subcategory)
+        db.session.commit()
+        
+        flash('Subcategory deleted successfully', 'success')
+        return redirect(url_for('subcategories'))
+    except IntegrityError as e:
+        db.session.rollback()
+        flash('Cannot delete this subcategory. It has associated data that prevents deletion.', 'error')
+        return redirect(url_for('subcategories'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the subcategory. Please try again.', 'error')
+        return redirect(url_for('subcategories'))
+
+@app.route('/subcategory_details/<int:subcategory_id>')
+@login_required
+@role_required(['admin'])
+def subcategory_details(subcategory_id):
+    try:
+        subcategory = SubCategory.query.get_or_404(subcategory_id)
+        
+        # Get subcategory statistics
+        total_products = Product.query.filter_by(subcategory_id=subcategory_id).count()
+        
+        # Get products in this subcategory
+        products = Product.query.filter_by(subcategory_id=subcategory_id).all()
+        
+        # Calculate subcategory revenue
+        subcategory_revenue = db.session.query(
+            db.func.sum(OrderItem.quantity * Product.sellingprice)
+        ).join(Product).join(Order).filter(
+            Product.subcategory_id == subcategory_id,
+            Order.payment_status == 'paid'
+        ).scalar() or 0
+        
+        # Get products by branch
+        products_by_branch = db.session.query(
+            Branch.name,
+            db.func.count(Product.id).label('product_count')
+        ).join(Product).filter(
+            Product.subcategory_id == subcategory_id
+        ).group_by(Branch.id, Branch.name).all()
+        
+        return render_template('subcategory_details.html', 
+                             subcategory=subcategory,
+                             total_products=total_products,
+                             products=products,
+                             subcategory_revenue=subcategory_revenue,
+                             products_by_branch=products_by_branch)
+    except Exception as e:
+        print(f"Error in subcategory details route: {e}")
+        flash('An error occurred while loading subcategory details.', 'error')
+        return redirect(url_for('subcategories'))
+
+# Product Description Management Routes
+@app.route('/product_descriptions/<int:product_id>')
+@login_required
+@role_required(['admin'])
+def product_descriptions(product_id):
+    try:
+        product = Product.query.get_or_404(product_id)
+        descriptions = ProductDescription.query.filter_by(
+            product_id=product_id, is_active=True
+        ).order_by(ProductDescription.sort_order, ProductDescription.created_at).all()
+        
+        return render_template('product_descriptions.html', 
+                             product=product, 
+                             descriptions=descriptions)
+    except Exception as e:
+        print(f"Error in product descriptions route: {e}")
+        flash('An error occurred while loading product descriptions.', 'error')
+        return redirect(url_for('products'))
+
+@app.route('/add_product_description/<int:product_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_product_description(product_id):
+    product = Product.query.get_or_404(product_id)
+    
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        content_type = request.form.get('content_type', 'text')
+        language = request.form.get('language', 'en')
+        sort_order = int(request.form.get('sort_order', 0))
+        
+        if not title or not content:
+            flash('Title and content are required', 'error')
+            return redirect(url_for('add_product_description', product_id=product_id))
+        
+        new_description = ProductDescription(
+            product_id=product_id,
+            title=title,
+            content=content,
+            content_type=content_type,
+            language=language,
+            sort_order=sort_order
+        )
+        
+        try:
+            db.session.add(new_description)
+            db.session.commit()
+            flash('Product description added successfully', 'success')
+            return redirect(url_for('product_descriptions', product_id=product_id))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while adding the description. Please try again.', 'error')
+            return redirect(url_for('add_product_description', product_id=product_id))
+    
+    return render_template('add_product_description.html', product=product)
+
+@app.route('/edit_product_description/<int:description_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_product_description(description_id):
+    description = ProductDescription.query.get_or_404(description_id)
+    
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        content_type = request.form.get('content_type', 'text')
+        language = request.form.get('language', 'en')
+        sort_order = int(request.form.get('sort_order', 0))
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not title or not content:
+            flash('Title and content are required', 'error')
+            return redirect(url_for('edit_product_description', description_id=description_id))
+        
+        description.title = title
+        description.content = content
+        description.content_type = content_type
+        description.language = language
+        description.sort_order = sort_order
+        description.is_active = is_active
+        
+        try:
+            db.session.commit()
+            flash('Product description updated successfully', 'success')
+            return redirect(url_for('product_descriptions', product_id=description.product_id))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating the description. Please try again.', 'error')
+            return redirect(url_for('edit_product_description', description_id=description_id))
+    
+    return render_template('edit_product_description.html', description=description)
+
+@app.route('/delete_product_description/<int:description_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_product_description(description_id):
+    try:
+        description = ProductDescription.query.get_or_404(description_id)
+        product_id = description.product_id
+        
+        db.session.delete(description)
+        db.session.commit()
+        
+        flash('Product description deleted successfully', 'success')
+        return redirect(url_for('product_descriptions', product_id=product_id))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the description. Please try again.', 'error')
+        return redirect(url_for('product_descriptions', product_id=description.product_id))
 
 # Error handlers
 @app.errorhandler(IntegrityError)

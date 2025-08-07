@@ -1,0 +1,210 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Product Descriptions</h3>
+        <h6 class="op-7 mb-2">Manage descriptions for {{ product.name }}</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('add_product_description', product_id=product.id) }}" class="btn btn-primary btn-round">
+          <i class="fas fa-plus"></i> Add Description
+        </a>
+        <a href="{{ url_for('products') }}" class="btn btn-secondary btn-round ms-2">
+          <i class="fas fa-arrow-left"></i> Back to Products
+        </a>
+      </div>
+    </div>
+
+    <!-- Product Info Card -->
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Product Information</h4>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-2">
+                {% if product.image_url %}
+                  <img src="{{ product.image_url }}" alt="{{ product.name }}" 
+                       class="img-fluid rounded" style="max-width: 150px;">
+                {% else %}
+                  <div class="bg-light rounded d-flex align-items-center justify-content-center" 
+                       style="width: 150px; height: 150px;">
+                    <i class="fas fa-box fa-3x text-muted"></i>
+                  </div>
+                {% endif %}
+              </div>
+              <div class="col-md-10">
+                <h4>{{ product.name }}</h4>
+                <p class="text-muted">
+                  <strong>Category:</strong> 
+                  {% if product.sub_category %}
+                    {{ product.sub_category.category.name }} > {{ product.sub_category.name }}
+                  {% else %}
+                    No category
+                  {% endif %}
+                  | <strong>Branch:</strong> 
+                  {% for branch in branches %}
+                    {% if branch.id == product.branchid %}
+                      {{ branch.name }}
+                    {% endif %}
+                  {% endfor %}
+                </p>
+                <p class="text-muted">
+                  <strong>Product Code:</strong> {{ product.productcode or 'N/A' }}
+                  | <strong>Stock:</strong> {{ product.stock or 0 }}
+                  | <strong>Status:</strong> 
+                  <span class="badge {% if product.display %}badge-success{% else %}badge-secondary{% endif %}">
+                    {{ 'Active' if product.display else 'Hidden' }}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Descriptions List -->
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Product Descriptions</h4>
+          </div>
+          <div class="card-body">
+            {% if descriptions %}
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Content Preview</th>
+                      <th>Type</th>
+                      <th>Language</th>
+                      <th>Order</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for description in descriptions %}
+                    <tr>
+                      <td>
+                        <strong>{{ description.title }}</strong>
+                      </td>
+                      <td>
+                        {% if description.content_type == 'html' %}
+                          {% if description.content|length > 100 %}
+                            {{ description.content[:100]|striptags }}...
+                          {% else %}
+                            {{ description.content|striptags }}
+                          {% endif %}
+                        {% else %}
+                          {% if description.content|length > 100 %}
+                            {{ description.content[:100] }}...
+                          {% else %}
+                            {{ description.content }}
+                          {% endif %}
+                        {% endif %}
+                      </td>
+                      <td>
+                        <span class="badge bg-info">{{ description.content_type }}</span>
+                      </td>
+                      <td>
+                        <span class="badge bg-secondary">{{ description.language }}</span>
+                      </td>
+                      <td>
+                        <span class="badge bg-primary">{{ description.sort_order }}</span>
+                      </td>
+                      <td>
+                        <span class="badge {% if description.is_active %}bg-success{% else %}bg-warning{% endif %}">
+                          {{ 'Active' if description.is_active else 'Inactive' }}
+                        </span>
+                      </td>
+                      <td>
+                        <small class="text-muted">{{ description.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                      </td>
+                      <td>
+                        <div class="btn-group" role="group">
+                          <a href="{{ url_for('edit_product_description', description_id=description.id) }}" 
+                             class="btn btn-sm btn-warning" title="Edit">
+                            <i class="fas fa-edit"></i>
+                          </a>
+                          <button type="button" class="btn btn-sm btn-danger" 
+                                  onclick="confirmDelete({{ description.id }}, '{{ description.title }}')" 
+                                  title="Delete">
+                            <i class="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-center py-5">
+                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No Descriptions Found</h4>
+                <p class="text-muted">Start by adding descriptions for this product.</p>
+                <a href="{{ url_for('add_product_description', product_id=product.id) }}" class="btn btn-primary">
+                  <i class="fas fa-plus"></i> Add First Description
+                </a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to delete the description "<span id="descriptionTitle"></span>"?
+        <br><br>
+        <strong class="text-danger">This action cannot be undone!</strong>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDelete(descriptionId, descriptionTitle) {
+  document.getElementById('descriptionTitle').textContent = descriptionTitle;
+  document.getElementById('deleteForm').action = '/delete_product_description/' + descriptionId;
+  const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+  modal.show();
+}
+</script>
+{% endblock %} 

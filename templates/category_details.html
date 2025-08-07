@@ -34,9 +34,16 @@
                   <label class="form-label">Category Name</label>
                   <div class="form-control-plaintext">
                     <div class="d-flex align-items-center">
-                      <div class="avatar-sm bg-info rounded-circle d-flex align-items-center justify-content-center me-3">
-                        <span class="text-white fw-bold">{{ category.name[0] }}</span>
-                      </div>
+                      {% if category.image_url %}
+                        <div class="avatar-sm me-3">
+                          <img src="{{ category.image_url }}" alt="{{ category.name }}" 
+                               class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                        </div>
+                      {% else %}
+                        <div class="avatar-sm bg-info rounded-circle d-flex align-items-center justify-content-center me-3">
+                          <span class="text-white fw-bold">{{ category.name[0] }}</span>
+                        </div>
+                      {% endif %}
                       <div>
                         <div class="fw-bold">{{ category.name }}</div>
                         <small class="text-muted">Category #{{ category.id }}</small>
@@ -56,7 +63,7 @@
             </div>
 
             <div class="row mt-3">
-              <div class="col-md-12">
+              <div class="col-md-6">
                 <div class="form-group">
                   <label class="form-label">Description</label>
                   <div class="form-control-plaintext">
@@ -64,6 +71,21 @@
                       {{ category.description }}
                     {% else %}
                       <span class="text-muted">No description provided</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label class="form-label">Category Image</label>
+                  <div class="form-control-plaintext">
+                    {% if category.image_url %}
+                      <div class="text-center">
+                        <img src="{{ category.image_url }}" alt="{{ category.name }}" 
+                             class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
+                      </div>
+                    {% else %}
+                      <span class="text-muted">No image uploaded</span>
                     {% endif %}
                   </div>
                 </div>

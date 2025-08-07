@@ -1,0 +1,272 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Edit Product Description</h3>
+        <h6 class="op-7 mb-2">Edit description for {{ description.product.name }}</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('product_descriptions', product_id=description.product.id) }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Descriptions
+        </a>
+      </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Edit Description Form -->
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Description Information</h4>
+          </div>
+          <div class="card-body">
+            <form method="POST">
+              <div class="mb-3">
+                <label for="title" class="form-label">Title *</label>
+                <input type="text" class="form-control" id="title" name="title" 
+                       value="{{ description.title }}" required>
+                <small class="form-text text-muted">
+                  Choose a descriptive title for this description section
+                </small>
+              </div>
+
+              <div class="mb-3">
+                <label for="content" class="form-label">Content *</label>
+                <div id="editor-container">
+                  <textarea class="form-control" id="content" name="content" rows="10" 
+                            required>{{ description.content }}</textarea>
+                </div>
+                <small class="form-text text-muted">
+                  Use the rich text editor to format your content. The content will be saved as HTML.
+                </small>
+              </div>
+
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="mb-3">
+                    <label for="content_type" class="form-label">Content Type</label>
+                    <select class="form-control" id="content_type" name="content_type">
+                      <option value="html" {% if description.content_type == 'html' %}selected{% endif %}>Rich Text (HTML)</option>
+                      <option value="text" {% if description.content_type == 'text' %}selected{% endif %}>Plain Text</option>
+                      <option value="markdown" {% if description.content_type == 'markdown' %}selected{% endif %}>Markdown</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="mb-3">
+                    <label for="language" class="form-label">Language</label>
+                    <select class="form-control" id="language" name="language">
+                      <option value="en" {% if description.language == 'en' %}selected{% endif %}>English</option>
+                      <option value="sw" {% if description.language == 'sw' %}selected{% endif %}>Swahili</option>
+                      <option value="fr" {% if description.language == 'fr' %}selected{% endif %}>French</option>
+                      <option value="ar" {% if description.language == 'ar' %}selected{% endif %}>Arabic</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="mb-3">
+                    <label for="sort_order" class="form-label">Sort Order</label>
+                    <input type="number" class="form-control" id="sort_order" name="sort_order" 
+                           value="{{ description.sort_order }}" min="0">
+                    <small class="form-text text-muted">
+                      Lower numbers appear first
+                    </small>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="mb-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="form-check form-switch">
+                      <input type="checkbox" class="form-check-input" id="is_active" name="is_active" 
+                             {% if description.is_active %}checked{% endif %}>
+                      <label class="form-check-label" for="is_active">Active</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <button type="submit" class="btn btn-primary btn-round">
+                  <i class="fas fa-save"></i> Update Description
+                </button>
+                <a href="{{ url_for('product_descriptions', product_id=description.product.id) }}" class="btn btn-secondary btn-round ms-2">
+                  <i class="fas fa-times"></i> Cancel
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Product Info</h4>
+          </div>
+          <div class="card-body">
+            <div class="text-center mb-3">
+              {% if description.product.image_url %}
+                <img src="{{ description.product.image_url }}" alt="{{ description.product.name }}" 
+                     class="img-fluid rounded" style="max-width: 200px;">
+              {% else %}
+                <div class="bg-light rounded d-flex align-items-center justify-content-center" 
+                     style="width: 200px; height: 200px; margin: 0 auto;">
+                  <i class="fas fa-box fa-3x text-muted"></i>
+                </div>
+              {% endif %}
+            </div>
+            <h5>{{ description.product.name }}</h5>
+            <p class="text-muted">
+              <strong>Category:</strong> 
+              {% if description.product.sub_category %}
+                {{ description.product.sub_category.category.name }} > {{ description.product.sub_category.name }}
+              {% else %}
+                No category
+              {% endif %}<br>
+              <strong>Branch:</strong> 
+              {% for branch in branches %}
+                {% if branch.id == description.product.branchid %}
+                  {{ branch.name }}
+                {% endif %}
+              {% endfor %}<br>
+              <strong>Product Code:</strong> {{ description.product.productcode or 'N/A' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Description Details</h4>
+          </div>
+          <div class="card-body">
+            <p><strong>Title:</strong> {{ description.title }}</p>
+            <p><strong>Type:</strong> {{ description.content_type }}</p>
+            <p><strong>Language:</strong> {{ description.language }}</p>
+            <p><strong>Order:</strong> {{ description.sort_order }}</p>
+            <p><strong>Status:</strong> 
+              <span class="badge {% if description.is_active %}bg-success{% else %}bg-warning{% endif %}">
+                {{ 'Active' if description.is_active else 'Inactive' }}
+              </span>
+            </p>
+            <p><strong>Created:</strong> {{ description.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            <p><strong>Updated:</strong> {{ description.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+          </div>
+        </div>
+
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Guidelines</h4>
+          </div>
+          <div class="card-body">
+            <ul class="list-unstyled">
+              <li class="mb-2">
+                <i class="fas fa-heading text-info"></i>
+                <strong>Title:</strong> Use clear, descriptive titles
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-align-left text-info"></i>
+                <strong>Content:</strong> Provide detailed, helpful information
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-code text-info"></i>
+                <strong>Content Type:</strong> Choose the appropriate format
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-language text-info"></i>
+                <strong>Language:</strong> Select the content language
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-sort text-info"></i>
+                <strong>Sort Order:</strong> Control display order
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-toggle-on text-info"></i>
+                <strong>Active Status:</strong> Enable/disable without deleting
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Include Summernote CSS and JS -->
+<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs5.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs5.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize Summernote rich text editor
+    $('#content').summernote({
+        height: 300,
+        toolbar: [
+            ['style', ['style']],
+            ['font', ['bold', 'underline', 'italic', 'clear']],
+            ['fontname', ['fontname']],
+            ['color', ['color']],
+            ['para', ['ul', 'ol', 'paragraph']],
+            ['height', ['height']],
+            ['table', ['table']],
+            ['insert', ['link', 'picture', 'video']],
+            ['view', ['fullscreen', 'codeview']],
+        ],
+        popover: {
+            image: [
+                ['image', ['resizeFull', 'resizeHalf', 'resizeQuarter', 'resizeNone']],
+                ['float', ['floatLeft', 'floatRight', 'floatNone']],
+                ['remove', ['removeMedia']]
+            ],
+            link: [
+                ['link', ['linkDialogShow', 'unlink']]
+            ],
+            table: [
+                ['add', ['addRowDown', 'addRowUp', 'addColLeft', 'addColRight']],
+                ['delete', ['deleteRow', 'deleteCol', 'deleteTable']],
+            ],
+            air: [
+                ['color', ['color']],
+                ['font', ['bold', 'underline', 'italic', 'clear']],
+                ['para', ['ul', 'paragraph']],
+                ['table', ['table']],
+                ['insert', ['link', 'picture']]
+            ]
+        },
+        callbacks: {
+            onImageUpload: function(files) {
+                // Handle image uploads if needed
+                console.log('Image upload:', files);
+            }
+        }
+    });
+
+    // Update content type when changed
+    $('#content_type').change(function() {
+        var contentType = $(this).val();
+        if (contentType === 'html') {
+            $('#content').summernote('enable');
+        } else {
+            $('#content').summernote('disable');
+        }
+    });
+
+    // Set initial state
+    $('#content_type').trigger('change');
+});
+</script>
+{% endblock %} 

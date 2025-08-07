@@ -5,12 +5,12 @@
   <div class="page-inner">
     <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
       <div>
-        <h3 class="fw-bold mb-3">Edit Category</h3>
-        <h6 class="op-7 mb-2">Update category information</h6>
+        <h3 class="fw-bold mb-3">Edit Subcategory</h3>
+        <h6 class="op-7 mb-2">Update subcategory information</h6>
       </div>
       <div class="ms-md-auto py-2 py-md-0">
-        <a href="{{ url_for('categories') }}" class="btn btn-secondary btn-round">
-          <i class="fas fa-arrow-left"></i> Back to Categories
+        <a href="{{ url_for('subcategories') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Subcategories
         </a>
       </div>
     </div>
@@ -20,18 +20,36 @@
         <div class="card card-round">
           <div class="card-header">
             <div class="card-head-row">
-              <div class="card-title">Edit Category: {{ category.name }}</div>
+              <div class="card-title">Edit Subcategory: {{ subcategory.name }}</div>
             </div>
           </div>
           <div class="card-body">
-            <form method="POST" action="{{ url_for('edit_category', id=category.id) }}" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data">
               <div class="row">
                 <div class="col-md-12">
                   <div class="form-group">
-                    <label for="name" class="form-label">Category Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="name" name="name" required 
-                           value="{{ category.name }}" placeholder="Enter category name">
-                    <small class="form-text text-muted">Choose a descriptive name that clearly identifies the category.</small>
+                    <label for="name" class="form-label">Subcategory Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="name" name="name" 
+                           value="{{ subcategory.name }}" required>
+                    <small class="form-text text-muted">Choose a descriptive name for the subcategory.</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row mt-3">
+                <div class="col-md-12">
+                  <div class="form-group">
+                    <label for="category_id" class="form-label">Parent Category <span class="text-danger">*</span></label>
+                    <select class="form-control" id="category_id" name="category_id" required>
+                      <option value="">Select a category</option>
+                      {% for category in categories %}
+                        <option value="{{ category.id }}" 
+                                {% if category.id == subcategory.category_id %}selected{% endif %}>
+                          {{ category.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">Select the main category this subcategory belongs to.</small>
                   </div>
                 </div>
               </div>
@@ -41,8 +59,8 @@
                   <div class="form-group">
                     <label for="description" class="form-label">Description</label>
                     <textarea class="form-control" id="description" name="description" rows="4" 
-                              placeholder="Enter a detailed description of this category">{{ category.description or '' }}</textarea>
-                    <small class="form-text text-muted">Provide additional details about what products belong in this category.</small>
+                              placeholder="Enter subcategory description (optional)">{{ subcategory.description or '' }}</textarea>
+                    <small class="form-text text-muted">Provide additional details about the subcategory.</small>
                   </div>
                 </div>
               </div>
@@ -50,12 +68,12 @@
               <div class="row mt-3">
                 <div class="col-md-12">
                   <div class="form-group">
-                    <label for="image" class="form-label">Category Image</label>
-                    {% if category.image_url %}
+                    <label for="image" class="form-label">Subcategory Image</label>
+                    {% if subcategory.image_url %}
                       <div class="mb-3">
                         <label class="form-label">Current Image:</label>
                         <div class="text-center">
-                          <img src="{{ category.image_url }}" alt="{{ category.name }}" 
+                          <img src="{{ subcategory.image_url }}" alt="{{ subcategory.name }}" 
                                class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
                         </div>
                       </div>
@@ -64,7 +82,7 @@
                       <input type="file" class="custom-file-input" id="image" name="image" 
                              accept="image/*" onchange="previewImage(this)">
                       <label class="custom-file-label" for="image">
-                        {% if category.image_url %}Change image{% else %}Choose file{% endif %}
+                        {% if subcategory.image_url %}Change image{% else %}Choose file{% endif %}
                       </label>
                     </div>
                     <small class="form-text text-muted">
@@ -90,9 +108,9 @@
                 <div class="col-md-12">
                   <div class="form-group">
                     <button type="submit" class="btn btn-primary btn-round">
-                      <i class="fas fa-save"></i> Update Category
+                      <i class="fas fa-save"></i> Update Subcategory
                     </button>
-                    <a href="{{ url_for('categories') }}" class="btn btn-secondary btn-round">
+                    <a href="{{ url_for('subcategories') }}" class="btn btn-secondary btn-round">
                       <i class="fas fa-times"></i> Cancel
                     </a>
                   </div>
@@ -107,7 +125,7 @@
         <div class="card card-round">
           <div class="card-header">
             <div class="card-head-row">
-              <div class="card-title">Category Info</div>
+              <div class="card-title">Subcategory Info</div>
             </div>
           </div>
           <div class="card-body">
@@ -117,27 +135,17 @@
                   <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
                     <i class="fas fa-box"></i>
                   </div>
-                  <h4 class="card-title">{{ category.products|length }}</h4>
+                  <h4 class="card-title">{{ subcategory.products|length }}</h4>
                   <p class="card-category">Products</p>
                 </div>
               </div>
               <div class="col-6">
                 <div class="text-center">
                   <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
-                    <i class="fas fa-dollar-sign"></i>
+                    <i class="fas fa-tags"></i>
                   </div>
-                  <h4 class="card-title">
-                    {% set category_revenue = 0 %}
-                    {% for product in category.products %}
-                      {% for order_item in product.order_items %}
-                        {% if order_item.order.payment_status == 'paid' %}
-                          {% set category_revenue = category_revenue + (product.sellingprice * order_item.quantity) %}
-                        {% endif %}
-                      {% endfor %}
-                    {% endfor %}
-                    ${{ "%.0f"|format(category_revenue) }}
-                  </h4>
-                  <p class="card-category">Revenue</p>
+                  <h4 class="card-title">{{ subcategory.category.name }}</h4>
+                  <p class="card-category">Parent Category</p>
                 </div>
               </div>
             </div>
@@ -145,19 +153,19 @@
             <hr>
 
             <div class="alert alert-info">
-              <h6><i class="fas fa-info-circle"></i> Category Details</h6>
+              <h6><i class="fas fa-info-circle"></i> Subcategory Details</h6>
               <ul class="mb-0">
-                <li><strong>ID:</strong> {{ category.id }}</li>
-                <li><strong>Created:</strong> {{ category.products[0].created_at.strftime('%Y-%m-%d') if category.products else 'N/A' }}</li>
+                <li><strong>ID:</strong> {{ subcategory.id }}</li>
+                <li><strong>Created:</strong> {{ subcategory.created_at.strftime('%Y-%m-%d') }}</li>
                 <li><strong>Status:</strong> 
-                  {% if category.products %}
+                  {% if subcategory.products %}
                     <span class="badge badge-success">Active</span>
                   {% else %}
                     <span class="badge badge-warning">Empty</span>
                   {% endif %}
                 </li>
                 <li><strong>Image:</strong> 
-                  {% if category.image_url %}
+                  {% if subcategory.image_url %}
                     <span class="badge badge-success">Has Image</span>
                   {% else %}
                     <span class="badge badge-secondary">No Image</span>
@@ -166,12 +174,45 @@
               </ul>
             </div>
 
-            {% if category.products %}
+            {% if subcategory.products %}
             <div class="alert alert-warning">
               <h6><i class="fas fa-exclamation-triangle"></i> Note</h6>
-              <p class="mb-0">This category has {{ category.products|length }} products. Changes will affect all associated products.</p>
+              <p class="mb-0">This subcategory has {{ subcategory.products|length }} products. Changes will affect all associated products.</p>
             </div>
             {% endif %}
+          </div>
+        </div>
+
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Guidelines</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="alert alert-info">
+              <h6><i class="fas fa-lightbulb"></i> Subcategory Best Practices</h6>
+              <ul class="mb-0">
+                <li>Use clear, descriptive names</li>
+                <li>Choose appropriate parent category</li>
+                <li>Add relevant subcategory images</li>
+                <li>Provide helpful descriptions</li>
+              </ul>
+            </div>
+
+            <div class="alert alert-warning">
+              <h6><i class="fas fa-exclamation-triangle"></i> Important Notes</h6>
+              <ul class="mb-0">
+                <li>Subcategory names should be unique within parent category</li>
+                <li>Subcategories cannot be deleted if they have products</li>
+                <li>Images are automatically optimized</li>
+              </ul>
+            </div>
+
+            <div class="text-center">
+              <i class="fas fa-folder fa-2x text-muted mb-2"></i>
+              <p class="text-muted small">Subcategories help organize products within main categories</p>
+            </div>
           </div>
         </div>
       </div>
@@ -184,20 +225,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form validation
     const form = document.querySelector('form');
     const nameInput = document.getElementById('name');
+    const categorySelect = document.getElementById('category_id');
     
     form.addEventListener('submit', function(e) {
         const name = nameInput.value.trim();
+        const categoryId = categorySelect.value;
         
         if (!name) {
             e.preventDefault();
-            alert('Please enter a category name.');
+            alert('Please enter a subcategory name.');
             nameInput.focus();
+            return false;
+        }
+        
+        if (!categoryId) {
+            e.preventDefault();
+            alert('Please select a parent category.');
+            categorySelect.focus();
             return false;
         }
         
         if (name.length < 2) {
             e.preventDefault();
-            alert('Category name must be at least 2 characters long.');
+            alert('Subcategory name must be at least 2 characters long.');
             nameInput.focus();
             return false;
         }
