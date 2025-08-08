@@ -47,7 +47,7 @@
             <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
               <i class="fas fa-building"></i>
             </div>
-            <h4 class="card-title text-primary">${{ "%.2f"|format(total_assets) }}</h4>
+            <h4 class="card-title text-primary">KSh {{ "{:,.0f}".format(total_assets) }}</h4>
             <p class="card-category">Total Assets</p>
           </div>
         </div>
@@ -58,7 +58,7 @@
             <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
               <i class="fas fa-boxes"></i>
             </div>
-            <h4 class="card-title text-warning">${{ "%.2f"|format(inventory_value) }}</h4>
+            <h4 class="card-title text-warning">KSh {{ "{:,.0f}".format(inventory_value) }}</h4>
             <p class="card-category">Inventory Value</p>
           </div>
         </div>
@@ -69,7 +69,7 @@
             <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
               <i class="fas fa-money-bill-wave"></i>
             </div>
-            <h4 class="card-title text-success">${{ "%.2f"|format(cash) }}</h4>
+            <h4 class="card-title text-success">KSh {{ "{:,.0f}".format(cash) }}</h4>
             <p class="card-category">Cash</p>
           </div>
         </div>
@@ -80,7 +80,7 @@
             <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
               <i class="fas fa-chart-line"></i>
             </div>
-            <h4 class="card-title text-info">${{ "%.2f"|format(retained_earnings) }}</h4>
+            <h4 class="card-title text-info">KSh {{ "{:,.0f}".format(retained_earnings) }}</h4>
             <p class="card-category">Retained Earnings</p>
           </div>
         </div>
@@ -106,19 +106,19 @@
                   </tr>
                   <tr>
                     <td class="ps-4">Cash</td>
-                    <td class="text-end">${{ "%.2f"|format(cash) }}</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(cash) }}</td>
                   </tr>
                   <tr>
                     <td class="ps-4">Accounts Receivable</td>
-                    <td class="text-end">${{ "%.2f"|format(accounts_receivable) }}</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(accounts_receivable) }}</td>
                   </tr>
                   <tr>
                     <td class="ps-4">Inventory</td>
-                    <td class="text-end">${{ "%.2f"|format(inventory_value) }}</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(inventory_value) }}</td>
                   </tr>
                   <tr class="border-bottom border-2">
                     <td class="fw-bold">Total Current Assets</td>
-                    <td class="text-end fw-bold text-primary">${{ "%.2f"|format(cash + accounts_receivable + inventory_value) }}</td>
+                    <td class="text-end fw-bold text-primary">KSh {{ "{:,.0f}".format(cash + accounts_receivable + inventory_value) }}</td>
                   </tr>
                   <tr>
                     <td class="fw-bold">Fixed Assets</td>
@@ -126,23 +126,23 @@
                   </tr>
                   <tr>
                     <td class="ps-4">Equipment & Machinery</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr>
                     <td class="ps-4">Furniture & Fixtures</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr class="border-bottom">
                     <td class="ps-4">Buildings & Land</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr class="border-bottom border-2">
                     <td class="fw-bold">Total Fixed Assets</td>
-                    <td class="text-end fw-bold">$0.00</td>
+                    <td class="text-end fw-bold">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr class="border-bottom border-3">
                     <td class="fw-bold fs-5">Total Assets</td>
-                    <td class="text-end fw-bold fs-5 text-primary">${{ "%.2f"|format(total_assets) }}</td>
+                    <td class="text-end fw-bold fs-5 text-primary">KSh {{ "{:,.0f}".format(total_assets) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -168,19 +168,19 @@
                   </tr>
                   <tr>
                     <td class="ps-4">Accounts Payable</td>
-                    <td class="text-end">${{ "%.2f"|format(accounts_payable) }}</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(accounts_payable) }}</td>
                   </tr>
                   <tr>
                     <td class="ps-4">Accrued Expenses</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr>
                     <td class="ps-4">Short-term Loans</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr class="border-bottom border-2">
                     <td class="fw-bold">Total Current Liabilities</td>
-                    <td class="text-end fw-bold text-danger">${{ "%.2f"|format(accounts_payable) }}</td>
+                    <td class="text-end fw-bold text-danger">KSh {{ "{:,.0f}".format(accounts_payable) }}</td>
                   </tr>
                   <tr>
                     <td class="fw-bold">Long-term Liabilities</td>
@@ -188,15 +188,15 @@
                   </tr>
                   <tr>
                     <td class="ps-4">Long-term Loans</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr class="border-bottom">
                     <td class="ps-4">Mortgages</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr class="border-bottom border-2">
                     <td class="fw-bold">Total Long-term Liabilities</td>
-                    <td class="text-end fw-bold">$0.00</td>
+                    <td class="text-end fw-bold">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr>
                     <td class="fw-bold">Equity</td>
@@ -204,15 +204,15 @@
                   </tr>
                   <tr>
                     <td class="ps-4">Retained Earnings</td>
-                    <td class="text-end">${{ "%.2f"|format(retained_earnings) }}</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(retained_earnings) }}</td>
                   </tr>
                   <tr class="border-bottom">
                     <td class="ps-4">Owner's Capital</td>
-                    <td class="text-end">$0.00</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(0) }}</td>
                   </tr>
                   <tr class="border-bottom border-3">
                     <td class="fw-bold fs-5">Total Liabilities & Equity</td>
-                    <td class="text-end fw-bold fs-5 text-primary">${{ "%.2f"|format(total_liabilities_equity) }}</td>
+                    <td class="text-end fw-bold fs-5 text-primary">KSh {{ "{:,.0f}".format(total_liabilities_equity) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -249,7 +249,7 @@
                       <div class="fw-bold">{{ category.name }}</div>
                     </td>
                     <td>
-                      <strong>${{ "%.2f"|format(category.value) }}</strong>
+                      <strong>KSh {{ "{:,.0f}".format(category.value) }}</strong>
                     </td>
                     <td>
                       <div class="progress" style="height: 20px;">
@@ -265,7 +265,7 @@
                 <tfoot>
                   <tr class="table-active">
                     <td class="fw-bold">Total Inventory</td>
-                    <td class="fw-bold">${{ "%.2f"|format(inventory_value) }}</td>
+                    <td class="fw-bold">KSh {{ "{:,.0f}".format(inventory_value) }}</td>
                     <td></td>
                   </tr>
                 </tfoot>
@@ -462,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const value = context.parsed;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const percentage = ((value / total) * 100).toFixed(1);
-                            return label + ': $' + value.toLocaleString() + ' (' + percentage + '%)';
+                            return label + ': KSh ' + value.toLocaleString() + ' (' + percentage + '%)';
                         }
                     }
                 }
@@ -502,7 +502,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const value = context.parsed;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const percentage = ((value / total) * 100).toFixed(1);
-                            return label + ': $' + value.toLocaleString() + ' (' + percentage + '%)';
+                            return label + ': KSh ' + value.toLocaleString() + ' (' + percentage + '%)';
                         }
                     }
                 }

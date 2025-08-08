@@ -241,3 +241,70 @@ class Expense(db.Model):
     branch = db.relationship('Branch', backref='expenses', lazy=True)
     user = db.relationship('User', foreign_keys=[user_id], backref='expenses_recorded', lazy=True)
     approver = db.relationship('User', foreign_keys=[approved_by], backref='expenses_approved', lazy=True)
+
+
+class Supplier(db.Model):
+    __tablename__ = 'suppliers'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    contact_person = db.Column(db.String, nullable=True)
+    email = db.Column(db.String, nullable=True)
+    phone = db.Column(db.String, nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    tax_number = db.Column(db.String, nullable=True)
+    payment_terms = db.Column(db.String, nullable=True)  # net 30, net 60, etc.
+    credit_limit = db.Column(db.Numeric(10, 2), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
+    
+    # Relationships
+    purchase_orders = db.relationship('PurchaseOrder', backref='supplier', lazy=True)
+
+
+class PurchaseOrder(db.Model):
+    __tablename__ = 'purchase_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    po_number = db.Column(db.String, nullable=False, unique=True)  # PO-YYYYMMDD-XXXX
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Who created the PO
+    order_date = db.Column(db.Date, nullable=False)
+    expected_delivery_date = db.Column(db.Date, nullable=True)
+    delivery_date = db.Column(db.Date, nullable=True)
+    subtotal = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    tax_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    discount_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    total_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    status = db.Column(db.String, default='draft')  # draft, submitted, approved, ordered, received, cancelled
+    payment_status = db.Column(db.String, default='pending')  # pending, partial, paid
+    payment_method = db.Column(db.String, nullable=True)  # cash, bank_transfer, check
+    notes = db.Column(db.Text, nullable=True)
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
+    
+    # Relationships
+    branch = db.relationship('Branch', backref='purchase_orders', lazy=True)
+    user = db.relationship('User', foreign_keys=[user_id], backref='purchase_orders_created', lazy=True)
+    approver = db.relationship('User', foreign_keys=[approved_by], backref='purchase_orders_approved', lazy=True)
+    items = db.relationship('PurchaseOrderItem', backref='purchase_order', lazy=True, cascade='all, delete-orphan')
+
+
+class PurchaseOrderItem(db.Model):
+    __tablename__ = 'purchase_order_items'
+    id = db.Column(db.Integer, primary_key=True)
+    purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    total_price = db.Column(db.Numeric(10, 2), nullable=False)
+    received_quantity = db.Column(db.Integer, nullable=False, default=0)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
+    
+    # Relationships
+    product = db.relationship('Product', backref='purchase_order_items', lazy=True)

@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 import os
 from config import Config
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import or_
 
 from extensions import db
 
@@ -34,7 +35,7 @@ login_manager.init_app(app)
 login_manager.login_view = 'login_post'
 
 # Import models after db is initialized
-from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription, Expense
+from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription, Expense, Supplier, PurchaseOrder, PurchaseOrderItem
 
 # Define EAT timezone
 EAT = timezone(timedelta(hours=3))
@@ -990,7 +991,9 @@ def profit_loss():
         # Calculate Revenue (from completed orders)
         revenue_query = db.session.query(
             db.func.sum(OrderItem.quantity * Product.sellingprice)
-        ).join(Product).join(Order).filter(
+        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
             Order.payment_status == 'paid',
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
@@ -1000,7 +1003,9 @@ def profit_loss():
         # Calculate Cost of Goods Sold (COGS)
         cogs_query = db.session.query(
             db.func.sum(OrderItem.quantity * Product.buyingprice)
-        ).join(Product).join(Order).filter(
+        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
             Order.payment_status == 'paid',
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
@@ -1009,6 +1014,31 @@ def profit_loss():
         
         # Calculate Gross Profit
         gross_profit = total_revenue - total_cogs
+        
+        # Calculate Total Expenses (approved expenses only)
+        total_expenses = db.session.query(
+            db.func.sum(Expense.amount)
+        ).filter(
+            Expense.status == 'approved',
+            Expense.expense_date >= start_dt.date(),
+            Expense.expense_date <= end_dt.date()
+        ).scalar() or 0
+        
+        # Calculate Net Profit
+        net_profit = gross_profit - total_expenses
+        
+        # Get expense breakdown by category
+        expenses_by_category = db.session.query(
+            Expense.category,
+            db.func.sum(Expense.amount).label('total_amount'),
+            db.func.count(Expense.id).label('count')
+        ).filter(
+            Expense.status == 'approved',
+            Expense.expense_date >= start_dt.date(),
+            Expense.expense_date <= end_dt.date()
+        ).group_by(Expense.category).order_by(
+            db.func.sum(Expense.amount).desc()
+        ).all()
         
         # Get order statistics
         total_orders = Order.query.filter(
@@ -1027,7 +1057,9 @@ def profit_loss():
             Product.name,
             db.func.sum(OrderItem.quantity).label('total_quantity'),
             db.func.sum(OrderItem.quantity * Product.sellingprice).label('total_revenue')
-        ).join(OrderItem).join(Order).filter(
+        ).select_from(Product).join(OrderItem, Product.id == OrderItem.productid).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
             Order.payment_status == 'paid',
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
@@ -1035,8 +1067,9 @@ def profit_loss():
             db.func.sum(OrderItem.quantity).desc()
         ).limit(10).all()
         
-        # Calculate profit margin
-        profit_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0
+        # Calculate profit margins
+        gross_profit_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0
+        net_profit_margin = (net_profit / total_revenue * 100) if total_revenue > 0 else 0
         
         return render_template('profit_loss.html',
                              start_date=start_date,
@@ -1044,10 +1077,14 @@ def profit_loss():
                              total_revenue=total_revenue,
                              total_cogs=total_cogs,
                              gross_profit=gross_profit,
-                             profit_margin=profit_margin,
+                             total_expenses=total_expenses,
+                             net_profit=net_profit,
+                             gross_profit_margin=gross_profit_margin,
+                             net_profit_margin=net_profit_margin,
                              total_orders=total_orders,
                              paid_orders=paid_orders,
-                             top_products=top_products)
+                             top_products=top_products,
+                             expenses_by_category=expenses_by_category)
     except Exception as e:
         print(f"Error in profit_loss route: {e}")
         flash('An error occurred while loading profit & loss data.', 'error')
@@ -1074,7 +1111,9 @@ def balance_sheet():
         # Accounts Receivable (pending payments)
         accounts_receivable = db.session.query(
             db.func.sum(OrderItem.quantity * Product.sellingprice)
-        ).join(Product).join(Order).filter(
+        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
             Order.payment_status == 'pending',
             Order.created_at <= as_of_dt
         ).scalar() or 0
@@ -1097,19 +1136,32 @@ def balance_sheet():
         # Retained Earnings (simplified calculation)
         total_revenue = db.session.query(
             db.func.sum(OrderItem.quantity * Product.sellingprice)
-        ).join(Product).join(Order).filter(
+        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
             Order.payment_status == 'paid',
             Order.created_at <= as_of_dt
         ).scalar() or 0
         
         total_cogs = db.session.query(
             db.func.sum(OrderItem.quantity * Product.buyingprice)
-        ).join(Product).join(Order).filter(
+        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
             Order.payment_status == 'paid',
             Order.created_at <= as_of_dt
         ).scalar() or 0
         
-        retained_earnings = total_revenue - total_cogs
+        # Calculate total expenses up to the balance sheet date
+        total_expenses = db.session.query(
+            db.func.sum(Expense.amount)
+        ).filter(
+            Expense.status == 'approved',
+            Expense.expense_date <= as_of_dt.date()
+        ).scalar() or 0
+        
+        # Retained Earnings = Revenue - COGS - Expenses
+        retained_earnings = total_revenue - total_cogs - total_expenses
         
         total_liabilities_equity = accounts_payable + retained_earnings
         
@@ -1117,12 +1169,16 @@ def balance_sheet():
         inventory_by_category = db.session.query(
             Category.name,
             db.func.sum(Product.stock * Product.buyingprice).label('value')
-        ).join(Product).filter(Product.stock > 0).group_by(Category.id, Category.name).all()
+        ).select_from(Category).join(SubCategory, Category.id == SubCategory.category_id).join(
+            Product, SubCategory.id == Product.subcategory_id
+        ).filter(Product.stock > 0).group_by(Category.id, Category.name).all()
         
         # Get recent transactions
         recent_transactions = db.session.query(
             Order, User, Branch
-        ).join(User).join(Branch).filter(
+        ).select_from(Order).join(User, Order.userid == User.id).join(
+            Branch, Order.branchid == Branch.id
+        ).filter(
             Order.created_at <= as_of_dt
         ).order_by(Order.created_at.desc()).limit(10).all()
         
@@ -1917,6 +1973,509 @@ def expense_details(id):
     expense = Expense.query.get_or_404(id)
     return render_template('expense_details.html', expense=expense)
 
+# Supplier Management Routes
+@app.route('/suppliers')
+@login_required
+@role_required(['admin'])
+def suppliers():
+    try:
+        # Pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Search and filter parameters
+        search = request.args.get('search', '')
+        status = request.args.get('status', '')
+        
+        # Build query
+        query = Supplier.query
+        
+        if search:
+            query = query.filter(
+                or_(
+                    Supplier.name.ilike(f'%{search}%'),
+                    Supplier.contact_person.ilike(f'%{search}%'),
+                    Supplier.email.ilike(f'%{search}%'),
+                    Supplier.phone.ilike(f'%{search}%')
+                )
+            )
+        
+        if status == 'active':
+            query = query.filter(Supplier.is_active == True)
+        elif status == 'inactive':
+            query = query.filter(Supplier.is_active == False)
+        
+        # Pagination
+        suppliers = query.order_by(Supplier.name).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return render_template('suppliers.html', suppliers=suppliers, search=search, status=status)
+    except Exception as e:
+        print(f"Error in suppliers route: {e}")
+        flash('An error occurred while loading suppliers.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/add_supplier', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_supplier():
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            contact_person = request.form.get('contact_person')
+            email = request.form.get('email')
+            phone = request.form.get('phone')
+            address = request.form.get('address')
+            tax_number = request.form.get('tax_number')
+            payment_terms = request.form.get('payment_terms')
+            credit_limit = request.form.get('credit_limit')
+            notes = request.form.get('notes')
+            is_active = request.form.get('is_active') == 'on'
+            
+            if not name:
+                flash('Supplier name is required', 'error')
+                return redirect(url_for('add_supplier'))
+            
+            # Convert credit_limit to decimal if provided
+            credit_limit_decimal = None
+            if credit_limit:
+                try:
+                    credit_limit_decimal = float(credit_limit)
+                except ValueError:
+                    flash('Invalid credit limit amount', 'error')
+                    return redirect(url_for('add_supplier'))
+            
+            new_supplier = Supplier(
+                name=name,
+                contact_person=contact_person,
+                email=email,
+                phone=phone,
+                address=address,
+                tax_number=tax_number,
+                payment_terms=payment_terms,
+                credit_limit=credit_limit_decimal,
+                notes=notes,
+                is_active=is_active
+            )
+            
+            db.session.add(new_supplier)
+            db.session.commit()
+            
+            flash('Supplier added successfully', 'success')
+            return redirect(url_for('suppliers'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error adding supplier: {e}")
+            flash('An error occurred while adding supplier.', 'error')
+            return redirect(url_for('add_supplier'))
+    
+    return render_template('add_supplier.html')
+
+@app.route('/edit_supplier/<int:id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_supplier(id):
+    supplier = Supplier.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            contact_person = request.form.get('contact_person')
+            email = request.form.get('email')
+            phone = request.form.get('phone')
+            address = request.form.get('address')
+            tax_number = request.form.get('tax_number')
+            payment_terms = request.form.get('payment_terms')
+            credit_limit = request.form.get('credit_limit')
+            notes = request.form.get('notes')
+            is_active = request.form.get('is_active') == 'on'
+            
+            if not name:
+                flash('Supplier name is required', 'error')
+                return redirect(url_for('edit_supplier', id=id))
+            
+            # Convert credit_limit to decimal if provided
+            credit_limit_decimal = None
+            if credit_limit:
+                try:
+                    credit_limit_decimal = float(credit_limit)
+                except ValueError:
+                    flash('Invalid credit limit amount', 'error')
+                    return redirect(url_for('edit_supplier', id=id))
+            
+            supplier.name = name
+            supplier.contact_person = contact_person
+            supplier.email = email
+            supplier.phone = phone
+            supplier.address = address
+            supplier.tax_number = tax_number
+            supplier.payment_terms = payment_terms
+            supplier.credit_limit = credit_limit_decimal
+            supplier.notes = notes
+            supplier.is_active = is_active
+            
+            db.session.commit()
+            flash('Supplier updated successfully', 'success')
+            return redirect(url_for('suppliers'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error updating supplier: {e}")
+            flash('An error occurred while updating supplier.', 'error')
+            return redirect(url_for('edit_supplier', id=id))
+    
+    return render_template('edit_supplier.html', supplier=supplier)
+
+@app.route('/delete_supplier/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_supplier(id):
+    try:
+        supplier = Supplier.query.get_or_404(id)
+        
+        # Check if supplier has purchase orders
+        if supplier.purchase_orders:
+            flash('Cannot delete supplier with associated purchase orders', 'error')
+            return redirect(url_for('suppliers'))
+        
+        db.session.delete(supplier)
+        db.session.commit()
+        flash('Supplier deleted successfully', 'success')
+        return redirect(url_for('suppliers'))
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting supplier: {e}")
+        flash('An error occurred while deleting supplier.', 'error')
+        return redirect(url_for('suppliers'))
+
+# Purchase Order Routes
+@app.route('/purchase_orders')
+@login_required
+@role_required(['admin'])
+def purchase_orders():
+    try:
+        # Pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Search and filter parameters
+        search = request.args.get('search', '')
+        status = request.args.get('status', '')
+        supplier_id = request.args.get('supplier_id', '')
+        branch_id = request.args.get('branch_id', '')
+        
+        # Build query
+        query = PurchaseOrder.query.select_from(PurchaseOrder).join(
+            Supplier, PurchaseOrder.supplier_id == Supplier.id
+        ).join(
+            Branch, PurchaseOrder.branch_id == Branch.id
+        ).join(
+            User, PurchaseOrder.user_id == User.id
+        )
+        
+        if search:
+            query = query.filter(
+                or_(
+                    PurchaseOrder.po_number.ilike(f'%{search}%'),
+                    Supplier.name.ilike(f'%{search}%'),
+                    User.firstname.ilike(f'%{search}%'),
+                    User.lastname.ilike(f'%{search}%')
+                )
+            )
+        
+        if status:
+            query = query.filter(PurchaseOrder.status == status)
+        
+        if supplier_id:
+            query = query.filter(PurchaseOrder.supplier_id == supplier_id)
+        
+        if branch_id:
+            query = query.filter(PurchaseOrder.branch_id == branch_id)
+        
+        # Pagination
+        purchase_orders = query.order_by(PurchaseOrder.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        # Get suppliers and branches for filters
+        suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+        branches = Branch.query.all()
+        
+        return render_template('purchase_orders.html', 
+                             purchase_orders=purchase_orders, 
+                             suppliers=suppliers,
+                             branches=branches,
+                             search=search, 
+                             status=status,
+                             supplier_id=supplier_id,
+                             branch_id=branch_id)
+    except Exception as e:
+        print(f"Error in purchase_orders route: {e}")
+        flash('An error occurred while loading purchase orders.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/add_purchase_order', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_purchase_order():
+    if request.method == 'POST':
+        try:
+            supplier_id = request.form.get('supplier_id')
+            branch_id = request.form.get('branch_id')
+            order_date = request.form.get('order_date')
+            expected_delivery_date = request.form.get('expected_delivery_date')
+            notes = request.form.get('notes')
+            
+            if not supplier_id or not branch_id or not order_date:
+                flash('Supplier, Branch, and Order Date are required', 'error')
+                return redirect(url_for('add_purchase_order'))
+            
+            # Generate PO number
+            today = datetime.now(EAT)
+            po_number = f"PO-{today.strftime('%Y%m%d')}-{today.strftime('%H%M%S')}"
+            
+            new_po = PurchaseOrder(
+                po_number=po_number,
+                supplier_id=supplier_id,
+                branch_id=branch_id,
+                user_id=current_user.id,
+                order_date=datetime.strptime(order_date, '%Y-%m-%d').date(),
+                expected_delivery_date=datetime.strptime(expected_delivery_date, '%Y-%m-%d').date() if expected_delivery_date else None,
+                notes=notes
+            )
+            
+            db.session.add(new_po)
+            db.session.commit()
+            
+            flash('Purchase Order created successfully', 'success')
+            return redirect(url_for('edit_purchase_order', id=new_po.id))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating purchase order: {e}")
+            flash('An error occurred while creating purchase order.', 'error')
+            return redirect(url_for('add_purchase_order'))
+    
+    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+    branches = Branch.query.all()
+    products = Product.query.all()
+    
+    return render_template('add_purchase_order.html', 
+                         suppliers=suppliers, 
+                         branches=branches,
+                         products=products)
+
+@app.route('/edit_purchase_order/<int:id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_purchase_order(id):
+    po = PurchaseOrder.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            supplier_id = request.form.get('supplier_id')
+            branch_id = request.form.get('branch_id')
+            order_date = request.form.get('order_date')
+            expected_delivery_date = request.form.get('expected_delivery_date')
+            notes = request.form.get('notes')
+            status = request.form.get('status')
+            
+            if not supplier_id or not branch_id or not order_date:
+                flash('Supplier, Branch, and Order Date are required', 'error')
+                return redirect(url_for('edit_purchase_order', id=id))
+            
+            po.supplier_id = supplier_id
+            po.branch_id = branch_id
+            po.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
+            po.expected_delivery_date = datetime.strptime(expected_delivery_date, '%Y-%m-%d').date() if expected_delivery_date else None
+            po.notes = notes
+            
+            if status and status != po.status:
+                po.status = status
+                if status == 'approved':
+                    po.approved_by = current_user.id
+                    po.approved_at = datetime.now(EAT)
+            
+            db.session.commit()
+            flash('Purchase Order updated successfully', 'success')
+            return redirect(url_for('purchase_orders'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error updating purchase order: {e}")
+            flash('An error occurred while updating purchase order.', 'error')
+            return redirect(url_for('edit_purchase_order', id=id))
+    
+    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+    branches = Branch.query.all()
+    products = Product.query.all()
+    
+    return render_template('edit_purchase_order.html', 
+                         po=po, 
+                         suppliers=suppliers, 
+                         branches=branches,
+                         products=products)
+
+@app.route('/delete_purchase_order/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_purchase_order(id):
+    try:
+        po = PurchaseOrder.query.get_or_404(id)
+        
+        if po.status not in ['draft', 'cancelled']:
+            flash('Cannot delete purchase order that is not in draft or cancelled status', 'error')
+            return redirect(url_for('purchase_orders'))
+        
+        db.session.delete(po)
+        db.session.commit()
+        flash('Purchase Order deleted successfully', 'success')
+        return redirect(url_for('purchase_orders'))
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting purchase order: {e}")
+        flash('An error occurred while deleting purchase order.', 'error')
+        return redirect(url_for('purchase_orders'))
+
+@app.route('/add_po_item/<int:po_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def add_po_item(po_id):
+    try:
+        po = PurchaseOrder.query.get_or_404(po_id)
+        
+        if po.status not in ['draft', 'submitted']:
+            flash('Cannot add items to purchase order that is not in draft or submitted status', 'error')
+            return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        product_id = request.form.get('product_id')
+        quantity = request.form.get('quantity')
+        unit_price = request.form.get('unit_price')
+        notes = request.form.get('notes')
+        
+        if not product_id or not quantity or not unit_price:
+            flash('Product, Quantity, and Unit Price are required', 'error')
+            return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        try:
+            quantity = int(quantity)
+            unit_price = float(unit_price)
+            total_price = quantity * unit_price
+        except ValueError:
+            flash('Invalid quantity or unit price', 'error')
+            return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        new_item = PurchaseOrderItem(
+            purchase_order_id=po_id,
+            product_id=product_id,
+            quantity=quantity,
+            unit_price=unit_price,
+            total_price=total_price,
+            notes=notes
+        )
+        
+        db.session.add(new_item)
+        
+        # Update PO totals
+        po.subtotal = sum(item.total_price for item in po.items)
+        po.total_amount = po.subtotal + po.tax_amount - po.discount_amount
+        
+        db.session.commit()
+        flash('Item added to purchase order successfully', 'success')
+        return redirect(url_for('edit_purchase_order', id=po_id))
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error adding PO item: {e}")
+        flash('An error occurred while adding item to purchase order.', 'error')
+        return redirect(url_for('edit_purchase_order', id=po_id))
+
+@app.route('/delete_po_item/<int:item_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_po_item(item_id):
+    try:
+        item = PurchaseOrderItem.query.get_or_404(item_id)
+        po = item.purchase_order
+        
+        if po.status not in ['draft', 'submitted']:
+            flash('Cannot delete items from purchase order that is not in draft or submitted status', 'error')
+            return redirect(url_for('edit_purchase_order', id=po.id))
+        
+        db.session.delete(item)
+        
+        # Update PO totals
+        po.subtotal = sum(item.total_price for item in po.items)
+        po.total_amount = po.subtotal + po.tax_amount - po.discount_amount
+        
+        db.session.commit()
+        flash('Item removed from purchase order successfully', 'success')
+        return redirect(url_for('edit_purchase_order', id=po.id))
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting PO item: {e}")
+        flash('An error occurred while removing item from purchase order.', 'error')
+        return redirect(url_for('purchase_orders'))
+
+@app.route('/receive_po/<int:po_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def receive_po(po_id):
+    try:
+        po = PurchaseOrder.query.get_or_404(po_id)
+        
+        if po.status != 'ordered':
+            flash('Purchase order must be in ordered status to receive', 'error')
+            return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        # Update received quantities and add stock
+        for item in po.items:
+            received_qty = request.form.get(f'received_qty_{item.id}', 0)
+            try:
+                received_qty = int(received_qty)
+                if received_qty > 0:
+                    item.received_quantity = received_qty
+                    
+                    # Add stock to product
+                    product = item.product
+                    old_stock = product.stock or 0
+                    product.stock = old_stock + received_qty
+                    
+                    # Create stock transaction
+                    stock_transaction = StockTransaction(
+                        productid=product.id,
+                        userid=current_user.id,
+                        transaction_type='add',
+                        quantity=received_qty,
+                        previous_stock=old_stock,
+                        new_stock=product.stock,
+                        notes=f'Received from PO {po.po_number}'
+                    )
+                    db.session.add(stock_transaction)
+            except ValueError:
+                flash('Invalid received quantity', 'error')
+                return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        po.status = 'received'
+        po.delivery_date = datetime.now(EAT).date()
+        
+        db.session.commit()
+        flash('Purchase order received successfully', 'success')
+        return redirect(url_for('purchase_orders'))
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error receiving PO: {e}")
+        flash('An error occurred while receiving purchase order.', 'error')
+        return redirect(url_for('edit_purchase_order', id=po_id))
+
+@app.route('/purchase_order_details/<int:po_id>')
+@login_required
+@role_required(['admin'])
+def purchase_order_details(po_id):
+    try:
+        po = PurchaseOrder.query.get_or_404(po_id)
+        return render_template('purchase_order_details.html', po=po)
+    except Exception as e:
+        print(f"Error in purchase_order_details route: {e}")
+        flash('An error occurred while loading purchase order details.', 'error')
+        return redirect(url_for('purchase_orders'))
 
 # Error handlers
 @app.errorhandler(IntegrityError)

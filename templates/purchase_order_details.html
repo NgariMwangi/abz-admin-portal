@@ -1,0 +1,291 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Purchase Order Details</h3>
+        <h6 class="op-7 mb-2">PO Number: {{ po.po_number }}</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('edit_purchase_order', id=po.id) }}" class="btn btn-warning btn-round me-2">
+          <i class="fas fa-edit"></i> Edit PO
+        </a>
+        <a href="{{ url_for('purchase_orders') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to POs
+        </a>
+      </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="row">
+      <div class="col-md-8">
+        <!-- Purchase Order Information -->
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Purchase Order Information</h4>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <h6>Basic Information</h6>
+                <p><strong>PO Number:</strong> {{ po.po_number }}</p>
+                <p><strong>Supplier:</strong> {{ po.supplier.name }}</p>
+                <p><strong>Branch:</strong> {{ po.branch.name }}</p>
+                <p><strong>Order Date:</strong> {{ po.order_date.strftime('%B %d, %Y') }}</p>
+                {% if po.expected_delivery_date %}
+                  <p><strong>Expected Delivery:</strong> {{ po.expected_delivery_date.strftime('%B %d, %Y') }}</p>
+                {% endif %}
+                {% if po.delivery_date %}
+                  <p><strong>Actual Delivery:</strong> {{ po.delivery_date.strftime('%B %d, %Y') }}</p>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <h6>Status Information</h6>
+                <p><strong>Status:</strong> 
+                  {% if po.status == 'draft' %}
+                    <span class="badge bg-secondary">Draft</span>
+                  {% elif po.status == 'submitted' %}
+                    <span class="badge bg-info">Submitted</span>
+                  {% elif po.status == 'approved' %}
+                    <span class="badge bg-success">Approved</span>
+                  {% elif po.status == 'ordered' %}
+                    <span class="badge bg-warning">Ordered</span>
+                  {% elif po.status == 'received' %}
+                    <span class="badge bg-primary">Received</span>
+                  {% elif po.status == 'cancelled' %}
+                    <span class="badge bg-danger">Cancelled</span>
+                  {% endif %}
+                </p>
+                <p><strong>Payment Status:</strong> 
+                  {% if po.payment_status == 'pending' %}
+                    <span class="badge bg-warning">Pending</span>
+                  {% elif po.payment_status == 'partial' %}
+                    <span class="badge bg-info">Partial</span>
+                  {% elif po.payment_status == 'paid' %}
+                    <span class="badge bg-success">Paid</span>
+                  {% endif %}
+                </p>
+                {% if po.payment_method %}
+                  <p><strong>Payment Method:</strong> {{ po.payment_method|title }}</p>
+                {% endif %}
+                <p><strong>Created By:</strong> {{ po.user.firstname }} {{ po.user.lastname }}</p>
+                <p><strong>Created:</strong> {{ po.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+              </div>
+            </div>
+            {% if po.notes %}
+            <div class="row mt-3">
+              <div class="col-12">
+                <h6>Notes</h6>
+                <p>{{ po.notes }}</p>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Purchase Order Items -->
+        <div class="card card-round mt-4">
+          <div class="card-header">
+            <h4 class="card-title">Purchase Order Items</h4>
+          </div>
+          <div class="card-body">
+            {% if po.items %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total Price</th>
+                    <th>Received</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in po.items %}
+                  <tr>
+                    <td>
+                      <div class="fw-bold">{{ item.product.name }}</div>
+                      <small class="text-muted">{{ item.product.productcode or 'No code' }}</small>
+                    </td>
+                    <td>
+                      <span class="badge bg-light text-dark">{{ item.quantity }}</span>
+                    </td>
+                    <td>
+                      <strong class="text-primary">KSh {{ "{:,.0f}".format(item.unit_price) }}</strong>
+                    </td>
+                    <td>
+                      <strong class="text-success">KSh {{ "{:,.0f}".format(item.total_price) }}</strong>
+                    </td>
+                    <td>
+                      {% if po.status == 'received' %}
+                        <span class="badge bg-success">{{ item.received_quantity }}/{{ item.quantity }}</span>
+                      {% else %}
+                        <span class="badge bg-secondary">{{ item.received_quantity }}/{{ item.quantity }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if item.notes %}
+                        <small class="text-muted">{{ item.notes }}</small>
+                      {% else %}
+                        <span class="text-muted">-</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-box fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No items in this purchase order</h5>
+              <p class="text-muted">Add items to see cost breakdown.</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <!-- Financial Summary -->
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Financial Summary</h4>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-8">
+                <strong>Subtotal:</strong>
+              </div>
+              <div class="col-4 text-end">
+                <strong>KSh {{ "{:,.0f}".format(po.subtotal) }}</strong>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-8">
+                <strong>Tax Amount:</strong>
+              </div>
+              <div class="col-4 text-end">
+                <strong class="text-danger">+ KSh {{ "{:,.0f}".format(po.tax_amount) }}</strong>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-8">
+                <strong>Discount:</strong>
+              </div>
+              <div class="col-4 text-end">
+                <strong class="text-success">- KSh {{ "{:,.0f}".format(po.discount_amount) }}</strong>
+              </div>
+            </div>
+            <hr>
+            <div class="row mb-3">
+              <div class="col-8">
+                <strong class="text-primary fs-5">Total Amount:</strong>
+              </div>
+              <div class="col-4 text-end">
+                <strong class="text-primary fs-5">KSh {{ "{:,.0f}".format(po.total_amount) }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cost Breakdown -->
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Cost Breakdown</h4>
+          </div>
+          <div class="card-body">
+            {% if po.items %}
+            <div class="mb-3">
+              <strong>Items Summary:</strong>
+              <ul class="list-unstyled mt-2">
+                {% for item in po.items %}
+                <li class="mb-1">
+                  <small>{{ item.product.name }}: {{ item.quantity }} × KSh {{ "{:,.0f}".format(item.unit_price) }} = KSh {{ "{:,.0f}".format(item.total_price) }}</small>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="mb-3">
+              <strong>Average Item Cost:</strong>
+              <div class="text-primary">KSh {{ "{:,.0f}".format(po.subtotal / po.items|length) }}</div>
+            </div>
+            <div class="mb-3">
+              <strong>Tax Rate:</strong>
+              {% if po.subtotal > 0 %}
+                <div class="text-danger">{{ "%.1f".format((po.tax_amount / po.subtotal) * 100) }}%</div>
+              {% else %}
+                <div class="text-muted">0%</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <strong>Discount Rate:</strong>
+              {% if po.subtotal > 0 %}
+                <div class="text-success">{{ "%.1f".format((po.discount_amount / po.subtotal) * 100) }}%</div>
+              {% else %}
+                <div class="text-muted">0%</div>
+              {% endif %}
+            </div>
+            {% else %}
+            <p class="text-muted">No items to show cost breakdown.</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Supplier Information -->
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Supplier Information</h4>
+          </div>
+          <div class="card-body">
+            <p><strong>Name:</strong> {{ po.supplier.name }}</p>
+            {% if po.supplier.contact_person %}
+              <p><strong>Contact:</strong> {{ po.supplier.contact_person }}</p>
+            {% endif %}
+            {% if po.supplier.email %}
+              <p><strong>Email:</strong> <a href="mailto:{{ po.supplier.email }}">{{ po.supplier.email }}</a></p>
+            {% endif %}
+            {% if po.supplier.phone %}
+              <p><strong>Phone:</strong> <a href="tel:{{ po.supplier.phone }}">{{ po.supplier.phone }}</a></p>
+            {% endif %}
+            {% if po.supplier.payment_terms %}
+              <p><strong>Payment Terms:</strong> {{ po.supplier.payment_terms }}</p>
+            {% endif %}
+            {% if po.supplier.credit_limit %}
+              <p><strong>Credit Limit:</strong> KSh {{ "{:,.0f}".format(po.supplier.credit_limit) }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Approval Information -->
+        {% if po.approved_by %}
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Approval Information</h4>
+          </div>
+          <div class="card-body">
+            <p><strong>Approved By:</strong> {{ po.approver.firstname }} {{ po.approver.lastname }}</p>
+            <p><strong>Approved On:</strong> {{ po.approved_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} 

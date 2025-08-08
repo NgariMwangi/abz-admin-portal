@@ -1,0 +1,234 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Edit Supplier</h3>
+        <h6 class="op-7 mb-2">Update supplier information</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('suppliers') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Suppliers
+        </a>
+      </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Edit Supplier Form -->
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Supplier Information</h4>
+          </div>
+          <div class="card-body">
+            <form method="POST">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="name" class="form-label">Supplier Name *</label>
+                    <input type="text" class="form-control" id="name" name="name" 
+                           value="{{ supplier.name }}" required>
+                    <small class="form-text text-muted">
+                      Enter the full business name of the supplier
+                    </small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="contact_person" class="form-label">Contact Person</label>
+                    <input type="text" class="form-control" id="contact_person" name="contact_person" 
+                           value="{{ supplier.contact_person or '' }}">
+                    <small class="form-text text-muted">
+                      Primary contact person's name
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" name="email" 
+                           value="{{ supplier.email or '' }}">
+                    <small class="form-text text-muted">
+                      Primary business email address
+                    </small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="phone" class="form-label">Phone</label>
+                    <input type="tel" class="form-control" id="phone" name="phone" 
+                           value="{{ supplier.phone or '' }}">
+                    <small class="form-text text-muted">
+                      Primary business phone number
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="tax_number" class="form-label">Tax Number</label>
+                    <input type="text" class="form-control" id="tax_number" name="tax_number" 
+                           value="{{ supplier.tax_number or '' }}">
+                    <small class="form-text text-muted">
+                      VAT/Tax registration number
+                    </small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="payment_terms" class="form-label">Payment Terms</label>
+                    <select class="form-control" id="payment_terms" name="payment_terms">
+                      <option value="">Select Payment Terms</option>
+                      <option value="net 30" {% if supplier.payment_terms == 'net 30' %}selected{% endif %}>Net 30</option>
+                      <option value="net 60" {% if supplier.payment_terms == 'net 60' %}selected{% endif %}>Net 60</option>
+                      <option value="net 90" {% if supplier.payment_terms == 'net 90' %}selected{% endif %}>Net 90</option>
+                      <option value="cash on delivery" {% if supplier.payment_terms == 'cash on delivery' %}selected{% endif %}>Cash on Delivery</option>
+                      <option value="advance payment" {% if supplier.payment_terms == 'advance payment' %}selected{% endif %}>Advance Payment</option>
+                      <option value="other" {% if supplier.payment_terms == 'other' %}selected{% endif %}>Other</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="credit_limit" class="form-label">Credit Limit (KSh)</label>
+                    <input type="number" class="form-control" id="credit_limit" name="credit_limit" 
+                           step="0.01" min="0" value="{{ supplier.credit_limit or '' }}">
+                    <small class="form-text text-muted">
+                      Maximum credit amount allowed
+                    </small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                             {% if supplier.is_active %}checked{% endif %}>
+                      <label class="form-check-label" for="is_active">
+                        Active Supplier
+                      </label>
+                    </div>
+                    <small class="form-text text-muted">
+                      Uncheck to deactivate this supplier
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="address" class="form-label">Address</label>
+                <textarea class="form-control" id="address" name="address" rows="3">{{ supplier.address or '' }}</textarea>
+                <small class="form-text text-muted">
+                  Complete business address
+                </small>
+              </div>
+
+              <div class="mb-3">
+                <label for="notes" class="form-label">Notes</label>
+                <textarea class="form-control" id="notes" name="notes" rows="3">{{ supplier.notes or '' }}</textarea>
+                <small class="form-text text-muted">
+                  Any additional notes about this supplier
+                </small>
+              </div>
+
+              <div class="mb-3">
+                <button type="submit" class="btn btn-primary btn-round">
+                  <i class="fas fa-save"></i> Update Supplier
+                </button>
+                <a href="{{ url_for('suppliers') }}" class="btn btn-secondary btn-round ms-2">
+                  <i class="fas fa-times"></i> Cancel
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Supplier Details</h4>
+          </div>
+          <div class="card-body">
+            <p><strong>Created:</strong> {{ supplier.created_at.strftime('%B %d, %Y') }}</p>
+            <p><strong>Last Updated:</strong> {{ supplier.updated_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+            <p><strong>Status:</strong> 
+              {% if supplier.is_active %}
+                <span class="badge bg-success">Active</span>
+              {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+              {% endif %}
+            </p>
+            {% if supplier.purchase_orders %}
+              <p><strong>Purchase Orders:</strong> {{ supplier.purchase_orders|length }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Guidelines</h4>
+          </div>
+          <div class="card-body">
+            <ul class="list-unstyled">
+              <li class="mb-2">
+                <i class="fas fa-building text-info"></i>
+                <strong>Name:</strong> Use the official business name
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-user text-info"></i>
+                <strong>Contact:</strong> Primary contact person's name
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-envelope text-info"></i>
+                <strong>Email:</strong> Business email for communications
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-phone text-info"></i>
+                <strong>Phone:</strong> Primary business phone number
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-receipt text-info"></i>
+                <strong>Tax Number:</strong> VAT/Tax registration number
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-calendar text-info"></i>
+                <strong>Payment Terms:</strong> Standard payment terms
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-credit-card text-info"></i>
+                <strong>Credit Limit:</strong> Maximum credit allowed
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-map-marker text-info"></i>
+                <strong>Address:</strong> Complete business address
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} 

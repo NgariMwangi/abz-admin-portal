@@ -240,6 +240,18 @@
                 <p>Expenses</p>
               </a>
             </li>
+            <li class="nav-item {% if request.endpoint in ['suppliers', 'add_supplier', 'edit_supplier'] %}active{% endif %}">
+              <a href="{{ url_for('suppliers') }}">
+                <i class="fas fa-truck"></i>
+                <p>Suppliers</p>
+              </a>
+            </li>
+            <li class="nav-item {% if request.endpoint in ['purchase_orders', 'add_purchase_order', 'edit_purchase_order', 'purchase_order_details'] %}active{% endif %}">
+              <a href="{{ url_for('purchase_orders') }}">
+                <i class="fas fa-shopping-cart"></i>
+                <p>Purchase Orders</p>
+              </a>
+            </li>
           </ul>
         </div>
       </div>

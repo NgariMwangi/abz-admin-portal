@@ -45,47 +45,69 @@
 
     <!-- Key Metrics -->
     <div class="row mb-4">
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="card card-round">
           <div class="card-body text-center">
             <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
               <i class="fas fa-dollar-sign"></i>
             </div>
-            <h4 class="card-title text-success">${{ "%.2f"|format(total_revenue) }}</h4>
+            <h4 class="card-title text-success">KSh {{ "{:,.0f}".format(total_revenue) }}</h4>
             <p class="card-category">Total Revenue</p>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="card card-round">
           <div class="card-body text-center">
             <div class="icon-big text-center icon-danger bubble-shadow-small mb-3">
               <i class="fas fa-shopping-cart"></i>
             </div>
-            <h4 class="card-title text-danger">${{ "%.2f"|format(total_cogs) }}</h4>
+            <h4 class="card-title text-danger">KSh {{ "{:,.0f}".format(total_cogs) }}</h4>
             <p class="card-category">Cost of Goods Sold</p>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="card card-round">
           <div class="card-body text-center">
             <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
               <i class="fas fa-chart-line"></i>
             </div>
-            <h4 class="card-title text-primary">${{ "%.2f"|format(gross_profit) }}</h4>
+            <h4 class="card-title text-primary">KSh {{ "{:,.0f}".format(gross_profit) }}</h4>
             <p class="card-category">Gross Profit</p>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+              <i class="fas fa-receipt"></i>
+            </div>
+            <h4 class="card-title text-warning">KSh {{ "{:,.0f}".format(total_expenses) }}</h4>
+            <p class="card-category">Total Expenses</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
         <div class="card card-round">
           <div class="card-body text-center">
             <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+              <i class="fas fa-chart-pie"></i>
+            </div>
+            <h4 class="card-title text-info">KSh {{ "{:,.0f}".format(net_profit) }}</h4>
+            <p class="card-category">Net Profit</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-secondary bubble-shadow-small mb-3">
               <i class="fas fa-percentage"></i>
             </div>
-            <h4 class="card-title text-info">{{ "%.1f"|format(profit_margin) }}%</h4>
-            <p class="card-category">Profit Margin</p>
+            <h4 class="card-title text-secondary">{{ "%.1f".format(net_profit_margin) }}%</h4>
+            <p class="card-category">Net Profit Margin</p>
           </div>
         </div>
       </div>
@@ -109,43 +131,45 @@
                 <tbody>
                   <tr class="border-bottom">
                     <td class="fw-bold">Revenue</td>
-                    <td class="text-end fw-bold text-success">${{ "%.2f"|format(total_revenue) }}</td>
+                    <td class="text-end fw-bold text-success">KSh {{ "{:,.0f}".format(total_revenue) }}</td>
                   </tr>
                   <tr class="border-bottom">
                     <td class="ps-4">Sales Revenue</td>
-                    <td class="text-end">${{ "%.2f"|format(total_revenue) }}</td>
+                    <td class="text-end">KSh {{ "{:,.0f}".format(total_revenue) }}</td>
                   </tr>
                   <tr class="border-bottom">
                     <td class="fw-bold">Cost of Goods Sold</td>
-                    <td class="text-end fw-bold text-danger">(${{ "%.2f"|format(total_cogs) }})</td>
+                    <td class="text-end fw-bold text-danger">(KSh {{ "{:,.0f}".format(total_cogs) }})</td>
                   </tr>
                   <tr class="border-bottom">
                     <td class="ps-4">Inventory Costs</td>
-                    <td class="text-end">(${{ "%.2f"|format(total_cogs) }})</td>
+                    <td class="text-end">(KSh {{ "{:,.0f}".format(total_cogs) }})</td>
                   </tr>
                   <tr class="border-bottom border-2">
                     <td class="fw-bold fs-5">Gross Profit</td>
-                    <td class="text-end fw-bold fs-5 text-primary">${{ "%.2f"|format(gross_profit) }}</td>
+                    <td class="text-end fw-bold fs-5 text-primary">KSh {{ "{:,.0f}".format(gross_profit) }}</td>
                   </tr>
                   <tr>
                     <td class="fw-bold">Operating Expenses</td>
-                    <td class="text-end fw-bold text-danger">($0.00)</td>
+                    <td class="text-end fw-bold text-danger">(KSh {{ "{:,.0f}".format(total_expenses) }})</td>
                   </tr>
+                  {% for expense in expenses_by_category %}
                   <tr class="border-bottom">
-                    <td class="ps-4">Rent & Utilities</td>
-                    <td class="text-end">($0.00)</td>
+                    <td class="ps-4">{{ expense.category|title }}</td>
+                    <td class="text-end">(KSh {{ "{:,.0f}".format(expense.total_amount) }})</td>
                   </tr>
+                  {% endfor %}
+                  {% if not expenses_by_category %}
                   <tr class="border-bottom">
-                    <td class="ps-4">Salaries & Wages</td>
-                    <td class="text-end">($0.00)</td>
+                    <td class="ps-4 text-muted">No expenses recorded</td>
+                    <td class="text-end text-muted">(KSh 0)</td>
                   </tr>
-                  <tr class="border-bottom">
-                    <td class="ps-4">Marketing & Advertising</td>
-                    <td class="text-end">($0.00)</td>
-                  </tr>
+                  {% endif %}
                   <tr class="border-bottom border-2">
                     <td class="fw-bold fs-5">Net Profit</td>
-                    <td class="text-end fw-bold fs-5 text-success">${{ "%.2f"|format(gross_profit) }}</td>
+                    <td class="text-end fw-bold fs-5 {% if net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                      KSh {{ "{:,.0f}".format(net_profit) }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -179,7 +203,7 @@
             <div class="mb-3">
               <small class="text-muted">Average Order Value</small>
               <div class="fw-bold fs-4 text-primary">
-                ${{ "%.2f"|format((total_revenue / paid_orders) if paid_orders > 0 else 0) }}
+                KSh {{ "%.2f"|format((total_revenue / paid_orders) if paid_orders > 0 else 0) }}
               </div>
             </div>
           </div>
@@ -189,7 +213,7 @@
 
     <!-- Top Selling Products -->
     <div class="row mt-4">
-      <div class="col-md-12">
+      <div class="col-md-8">
         <div class="card card-round">
           <div class="card-header">
             <div class="card-head-row">
@@ -218,13 +242,13 @@
                       <span class="badge badge-light fs-6">{{ product.total_quantity }}</span>
                     </td>
                     <td>
-                      <strong>${{ "%.2f"|format(product.total_revenue) }}</strong>
+                      <strong>KSh {{ "{:,.0f}".format(product.total_revenue) }}</strong>
                     </td>
                     <td>
                       <div class="progress" style="height: 20px;">
                         <div class="progress-bar bg-primary" role="progressbar" 
                              style="width: {{ (product.total_revenue / total_revenue * 100) if total_revenue > 0 else 0 }}%">
-                          {{ "%.1f"|format((product.total_revenue / total_revenue * 100) if total_revenue > 0 else 0) }}%
+                          {{ "%.1f".format((product.total_revenue / total_revenue * 100) if total_revenue > 0 else 0) }}%
                         </div>
                       </div>
                     </td>
@@ -238,6 +262,52 @@
               <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
               <h5 class="text-muted">No sales data</h5>
               <p class="text-muted">No products were sold in the selected period.</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title">Expense Breakdown</div>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if expenses_by_category %}
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for expense in expenses_by_category %}
+                  <tr>
+                    <td>
+                      <div class="fw-bold">{{ expense.category|title }}</div>
+                    </td>
+                    <td>
+                      <strong class="text-danger">KSh {{ "{:,.0f}".format(expense.total_amount) }}</strong>
+                    </td>
+                    <td>
+                      <span class="badge badge-secondary">{{ expense.count }}</span>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No expenses</h5>
+              <p class="text-muted">No expenses recorded in the selected period.</p>
             </div>
             {% endif %}
           </div>
