@@ -1,0 +1,223 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Edit Expense</h3>
+        <h6 class="op-7 mb-2">Update expense information</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('expenses') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Expenses
+        </a>
+      </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Edit Expense Form -->
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Expense Information</h4>
+          </div>
+          <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="title" class="form-label">Title *</label>
+                    <input type="text" class="form-control" id="title" name="title" 
+                           value="{{ expense.title }}" required>
+                    <small class="form-text text-muted">
+                      Provide a clear, descriptive title for this expense
+                    </small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="amount" class="form-label">Amount (KSh) *</label>
+                    <input type="number" class="form-control" id="amount" name="amount" 
+                           step="0.01" min="0" value="{{ expense.amount }}" required>
+                    <small class="form-text text-muted">
+                      Enter the expense amount in Kenyan Shillings
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="category" class="form-label">Category *</label>
+                    <select class="form-control" id="category" name="category" required>
+                      <option value="">Select Category</option>
+                      <option value="rent" {% if expense.category == 'rent' %}selected{% endif %}>Rent</option>
+                      <option value="utilities" {% if expense.category == 'utilities' %}selected{% endif %}>Utilities</option>
+                      <option value="salaries" {% if expense.category == 'salaries' %}selected{% endif %}>Salaries</option>
+                      <option value="supplies" {% if expense.category == 'supplies' %}selected{% endif %}>Supplies</option>
+                      <option value="marketing" {% if expense.category == 'marketing' %}selected{% endif %}>Marketing</option>
+                      <option value="transport" {% if expense.category == 'transport' %}selected{% endif %}>Transport</option>
+                      <option value="maintenance" {% if expense.category == 'maintenance' %}selected{% endif %}>Maintenance</option>
+                      <option value="insurance" {% if expense.category == 'insurance' %}selected{% endif %}>Insurance</option>
+                      <option value="taxes" {% if expense.category == 'taxes' %}selected{% endif %}>Taxes</option>
+                      <option value="other" {% if expense.category == 'other' %}selected{% endif %}>Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="expense_date" class="form-label">Expense Date *</label>
+                    <input type="date" class="form-control" id="expense_date" name="expense_date" 
+                           value="{{ expense.expense_date.strftime('%Y-%m-%d') }}" required>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="payment_method" class="form-label">Payment Method</label>
+                    <select class="form-control" id="payment_method" name="payment_method">
+                      <option value="">Select Payment Method</option>
+                      <option value="cash" {% if expense.payment_method == 'cash' %}selected{% endif %}>Cash</option>
+                      <option value="bank_transfer" {% if expense.payment_method == 'bank_transfer' %}selected{% endif %}>Bank Transfer</option>
+                      <option value="card" {% if expense.payment_method == 'card' %}selected{% endif %}>Card</option>
+                      <option value="mobile_money" {% if expense.payment_method == 'mobile_money' %}selected{% endif %}>Mobile Money</option>
+                      <option value="check" {% if expense.payment_method == 'check' %}selected{% endif %}>Check</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="branch_id" class="form-label">Branch</label>
+                    <select class="form-control" id="branch_id" name="branch_id">
+                      <option value="">General (All Branches)</option>
+                      {% for branch in branches %}
+                        <option value="{{ branch.id }}" {% if expense.branch_id == branch.id %}selected{% endif %}>{{ branch.name }}</option>
+                      {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">
+                      Leave empty if this expense applies to all branches
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="description" class="form-label">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="4" 
+                          placeholder="Provide detailed description of the expense...">{{ expense.description or '' }}</textarea>
+                <small class="form-text text-muted">
+                  Include any relevant details about this expense
+                </small>
+              </div>
+
+              <div class="mb-3">
+                <label for="receipt" class="form-label">Receipt/Invoice</label>
+                {% if expense.receipt_url %}
+                  <div class="mb-2">
+                    <strong>Current Receipt:</strong>
+                    <a href="{{ expense.receipt_url }}" target="_blank" class="btn btn-sm btn-info ms-2">
+                      <i class="fas fa-eye"></i> View Current Receipt
+                    </a>
+                  </div>
+                {% endif %}
+                <input type="file" class="form-control" id="receipt" name="receipt" 
+                       accept="image/*,.pdf">
+                <small class="form-text text-muted">
+                  Upload new receipt or invoice image (JPG, PNG, PDF). Leave empty to keep current receipt.
+                </small>
+              </div>
+
+              <div class="mb-3">
+                <button type="submit" class="btn btn-primary btn-round">
+                  <i class="fas fa-save"></i> Update Expense
+                </button>
+                <a href="{{ url_for('expenses') }}" class="btn btn-secondary btn-round ms-2">
+                  <i class="fas fa-times"></i> Cancel
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Expense Details</h4>
+          </div>
+          <div class="card-body">
+            <p><strong>Status:</strong> 
+              {% if expense.status == 'pending' %}
+                <span class="badge bg-warning">Pending</span>
+              {% elif expense.status == 'approved' %}
+                <span class="badge bg-success">Approved</span>
+              {% elif expense.status == 'rejected' %}
+                <span class="badge bg-danger">Rejected</span>
+              {% endif %}
+            </p>
+            <p><strong>Recorded By:</strong> {{ expense.user.firstname }} {{ expense.user.lastname }}</p>
+            <p><strong>Recorded On:</strong> {{ expense.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            {% if expense.approved_by %}
+              <p><strong>Approved By:</strong> {{ expense.approver.firstname }} {{ expense.approver.lastname }}</p>
+              <p><strong>Approved On:</strong> {{ expense.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            {% endif %}
+            {% if expense.approval_notes %}
+              <p><strong>Notes:</strong> {{ expense.approval_notes }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Guidelines</h4>
+          </div>
+          <div class="card-body">
+            <ul class="list-unstyled">
+              <li class="mb-2">
+                <i class="fas fa-heading text-info"></i>
+                <strong>Title:</strong> Use clear, descriptive titles
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-tags text-info"></i>
+                <strong>Category:</strong> Choose the most appropriate category
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-calendar text-info"></i>
+                <strong>Date:</strong> Use the actual expense date
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-money-bill text-info"></i>
+                <strong>Amount:</strong> Enter the exact amount paid
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-building text-info"></i>
+                <strong>Branch:</strong> Select specific branch if applicable
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-file-upload text-info"></i>
+                <strong>Receipt:</strong> Upload receipt for verification
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} 

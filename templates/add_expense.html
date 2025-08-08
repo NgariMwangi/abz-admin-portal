@@ -1,0 +1,223 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Add New Expense</h3>
+        <h6 class="op-7 mb-2">Record a new business expense</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('expenses') }}" class="btn btn-secondary btn-round">
+          <i class="fas fa-arrow-left"></i> Back to Expenses
+        </a>
+      </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Add Expense Form -->
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Expense Information</h4>
+          </div>
+          <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="title" class="form-label">Title *</label>
+                    <input type="text" class="form-control" id="title" name="title" 
+                           placeholder="e.g., Office Rent Payment" required>
+                    <small class="form-text text-muted">
+                      Provide a clear, descriptive title for this expense
+                    </small>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="amount" class="form-label">Amount (KSh) *</label>
+                    <input type="number" class="form-control" id="amount" name="amount" 
+                           step="0.01" min="0" placeholder="0.00" required>
+                    <small class="form-text text-muted">
+                      Enter the expense amount in Kenyan Shillings
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="category" class="form-label">Category *</label>
+                    <select class="form-control" id="category" name="category" required>
+                      <option value="">Select Category</option>
+                      <option value="rent">Rent</option>
+                      <option value="utilities">Utilities</option>
+                      <option value="salaries">Salaries</option>
+                      <option value="supplies">Supplies</option>
+                      <option value="marketing">Marketing</option>
+                      <option value="transport">Transport</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="insurance">Insurance</option>
+                      <option value="taxes">Taxes</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="expense_date" class="form-label">Expense Date *</label>
+                    <input type="date" class="form-control" id="expense_date" name="expense_date" 
+                           value="{{ today }}" required>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="payment_method" class="form-label">Payment Method</label>
+                    <select class="form-control" id="payment_method" name="payment_method">
+                      <option value="">Select Payment Method</option>
+                      <option value="cash">Cash</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="card">Card</option>
+                      <option value="mobile_money">Mobile Money</option>
+                      <option value="check">Check</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="branch_id" class="form-label">Branch</label>
+                    <select class="form-control" id="branch_id" name="branch_id">
+                      <option value="">General (All Branches)</option>
+                      {% for branch in branches %}
+                        <option value="{{ branch.id }}">{{ branch.name }}</option>
+                      {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">
+                      Leave empty if this expense applies to all branches
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="description" class="form-label">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="4" 
+                          placeholder="Provide detailed description of the expense..."></textarea>
+                <small class="form-text text-muted">
+                  Include any relevant details about this expense
+                </small>
+              </div>
+
+              <div class="mb-3">
+                <label for="receipt" class="form-label">Receipt/Invoice</label>
+                <input type="file" class="form-control" id="receipt" name="receipt" 
+                       accept="image/*,.pdf">
+                <small class="form-text text-muted">
+                  Upload receipt or invoice image (JPG, PNG, PDF)
+                </small>
+              </div>
+
+              <div class="mb-3">
+                <button type="submit" class="btn btn-primary btn-round">
+                  <i class="fas fa-save"></i> Add Expense
+                </button>
+                <a href="{{ url_for('expenses') }}" class="btn btn-secondary btn-round ms-2">
+                  <i class="fas fa-times"></i> Cancel
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-round">
+          <div class="card-header">
+            <h4 class="card-title">Guidelines</h4>
+          </div>
+          <div class="card-body">
+            <ul class="list-unstyled">
+              <li class="mb-2">
+                <i class="fas fa-heading text-info"></i>
+                <strong>Title:</strong> Use clear, descriptive titles
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-tags text-info"></i>
+                <strong>Category:</strong> Choose the most appropriate category
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-calendar text-info"></i>
+                <strong>Date:</strong> Use the actual expense date
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-money-bill text-info"></i>
+                <strong>Amount:</strong> Enter the exact amount paid
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-building text-info"></i>
+                <strong>Branch:</strong> Select specific branch if applicable
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-file-upload text-info"></i>
+                <strong>Receipt:</strong> Upload receipt for verification
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card card-round mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Expense Categories</h4>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-6">
+                <small class="text-muted">
+                  <strong>Rent:</strong> Office/Shop rent<br>
+                  <strong>Utilities:</strong> Electricity, water, internet<br>
+                  <strong>Salaries:</strong> Employee payments<br>
+                  <strong>Supplies:</strong> Office supplies, materials
+                </small>
+              </div>
+              <div class="col-6">
+                <small class="text-muted">
+                  <strong>Marketing:</strong> Advertising, promotions<br>
+                  <strong>Transport:</strong> Fuel, vehicle maintenance<br>
+                  <strong>Maintenance:</strong> Equipment repairs<br>
+                  <strong>Other:</strong> Miscellaneous expenses
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Set today's date as default
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('expense_date').value = today;
+});
+</script>
+{% endblock %} 

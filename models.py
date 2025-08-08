@@ -217,3 +217,27 @@ class SubCategory(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
 
     products = db.relationship('Product', backref='sub_category', lazy=True)
+
+
+class Expense(db.Model):
+    __tablename__ = 'expenses'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    category = db.Column(db.String, nullable=False)  # rent, utilities, salaries, supplies, marketing, etc.
+    expense_date = db.Column(db.Date, nullable=False)
+    payment_method = db.Column(db.String, nullable=True)  # cash, bank_transfer, card, mobile_money
+    receipt_url = db.Column(db.String, nullable=True)  # URL to uploaded receipt image
+    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Who recorded the expense
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Who approved the expense
+    status = db.Column(db.String, default='pending')  # pending, approved, rejected
+    approval_notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
+    
+    # Relationships
+    branch = db.relationship('Branch', backref='expenses', lazy=True)
+    user = db.relationship('User', foreign_keys=[user_id], backref='expenses_recorded', lazy=True)
+    approver = db.relationship('User', foreign_keys=[approved_by], backref='expenses_approved', lazy=True)

@@ -1,0 +1,284 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Expenses Management</h3>
+        <h6 class="op-7 mb-2">Track and manage business expenses</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('add_expense') }}" class="btn btn-primary btn-round">
+          <i class="fas fa-plus"></i> Add Expense
+        </a>
+      </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Filters -->
+    <div class="card card-round mb-4">
+      <div class="card-header">
+        <h4 class="card-title">Filters</h4>
+      </div>
+      <div class="card-body">
+        <form method="GET" class="row g-3">
+          <div class="col-md-2">
+            <label for="status" class="form-label">Status</label>
+            <select class="form-control" id="status" name="status">
+              <option value="">All Status</option>
+              <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+              <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+              <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label for="category" class="form-label">Category</label>
+            <select class="form-control" id="category" name="category">
+              <option value="">All Categories</option>
+              {% for category in categories %}
+                <option value="{{ category }}" {% if category_filter == category %}selected{% endif %}>{{ category|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label for="branch" class="form-label">Branch</label>
+            <select class="form-control" id="branch" name="branch">
+              <option value="">All Branches</option>
+              {% for branch in branches %}
+                <option value="{{ branch.id }}" {% if branch_filter|int == branch.id %}selected{% endif %}>{{ branch.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label for="date_from" class="form-label">From Date</label>
+            <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+          </div>
+          <div class="col-md-2">
+            <label for="date_to" class="form-label">To Date</label>
+            <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">Filter</button>
+            <a href="{{ url_for('expenses') }}" class="btn btn-secondary">Clear</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Expenses Table -->
+    <div class="card card-round">
+      <div class="card-header">
+        <h4 class="card-title">Expenses List</h4>
+      </div>
+      <div class="card-body">
+        {% if expenses.items %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Branch</th>
+                  <th>Status</th>
+                  <th>Recorded By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for expense in expenses.items %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for('expense_details', id=expense.id) }}" class="text-primary fw-bold">
+                      {{ expense.title }}
+                    </a>
+                  </td>
+                  <td>
+                    <span class="badge bg-info">{{ expense.category|title }}</span>
+                  </td>
+                  <td>
+                    <span class="fw-bold text-danger">KSh {{ "{:,.2f}".format(expense.amount) }}</span>
+                  </td>
+                  <td>{{ expense.expense_date.strftime('%Y-%m-%d') }}</td>
+                  <td>
+                    {% if expense.branch %}
+                      {{ expense.branch.name }}
+                    {% else %}
+                      <span class="text-muted">General</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if expense.status == 'pending' %}
+                      <span class="badge bg-warning">Pending</span>
+                    {% elif expense.status == 'approved' %}
+                      <span class="badge bg-success">Approved</span>
+                    {% elif expense.status == 'rejected' %}
+                      <span class="badge bg-danger">Rejected</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <small>{{ expense.user.firstname }} {{ expense.user.lastname }}</small>
+                  </td>
+                  <td>
+                    <div class="btn-group" role="group">
+                      <a href="{{ url_for('expense_details', id=expense.id) }}" 
+                         class="btn btn-sm btn-info" title="View Details">
+                        <i class="fas fa-eye"></i>
+                      </a>
+                      <a href="{{ url_for('edit_expense', id=expense.id) }}" 
+                         class="btn btn-sm btn-warning" title="Edit">
+                        <i class="fas fa-edit"></i>
+                      </a>
+                      {% if expense.status == 'pending' %}
+                        <button type="button" class="btn btn-sm btn-success" 
+                                data-bs-toggle="modal" data-bs-target="#approveModal{{ expense.id }}" title="Approve">
+                          <i class="fas fa-check"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger" 
+                                data-bs-toggle="modal" data-bs-target="#rejectModal{{ expense.id }}" title="Reject">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      {% endif %}
+                      <button type="button" class="btn btn-sm btn-danger" 
+                              data-bs-toggle="modal" data-bs-target="#deleteModal{{ expense.id }}" title="Delete">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+
+                    <!-- Approve Modal -->
+                    <div class="modal fade" id="approveModal{{ expense.id }}" tabindex="-1">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title">Approve Expense</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                          </div>
+                          <form action="{{ url_for('approve_expense', id=expense.id) }}" method="POST">
+                            <div class="modal-body">
+                              <p>Are you sure you want to approve this expense?</p>
+                              <p><strong>{{ expense.title }}</strong> - KSh {{ "{:,.2f}".format(expense.amount) }}</p>
+                              <div class="mb-3">
+                                <label for="approval_notes" class="form-label">Approval Notes (Optional)</label>
+                                <textarea class="form-control" id="approval_notes" name="approval_notes" rows="3"></textarea>
+                              </div>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                              <button type="submit" class="btn btn-success">Approve</button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Reject Modal -->
+                    <div class="modal fade" id="rejectModal{{ expense.id }}" tabindex="-1">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title">Reject Expense</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                          </div>
+                          <form action="{{ url_for('reject_expense', id=expense.id) }}" method="POST">
+                            <div class="modal-body">
+                              <p>Are you sure you want to reject this expense?</p>
+                              <p><strong>{{ expense.title }}</strong> - KSh {{ "{:,.2f}".format(expense.amount) }}</p>
+                              <div class="mb-3">
+                                <label for="approval_notes" class="form-label">Rejection Notes (Required)</label>
+                                <textarea class="form-control" id="approval_notes" name="approval_notes" rows="3" required></textarea>
+                              </div>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                              <button type="submit" class="btn btn-danger">Reject</button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Delete Modal -->
+                    <div class="modal fade" id="deleteModal{{ expense.id }}" tabindex="-1">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title">Delete Expense</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                          </div>
+                          <div class="modal-body">
+                            <p>Are you sure you want to delete this expense?</p>
+                            <p><strong>{{ expense.title }}</strong> - KSh {{ "{:,.2f}".format(expense.amount) }}</p>
+                            <p class="text-danger">This action cannot be undone.</p>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <form action="{{ url_for('delete_expense', id=expense.id) }}" method="POST" class="d-inline">
+                              <button type="submit" class="btn btn-danger">Delete</button>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          {% if expenses.pages > 1 %}
+            <nav aria-label="Expenses pagination">
+              <ul class="pagination justify-content-center">
+                {% if expenses.has_prev %}
+                  <li class="page-item">
+                    <a class="page-link" href="{{ url_for('expenses', page=expenses.prev_num, status=status_filter, category=category_filter, branch=branch_filter, date_from=date_from, date_to=date_to) }}">Previous</a>
+                  </li>
+                {% endif %}
+                
+                {% for page_num in expenses.iter_pages() %}
+                  {% if page_num %}
+                    <li class="page-item {% if page_num == expenses.page %}active{% endif %}">
+                      <a class="page-link" href="{{ url_for('expenses', page=page_num, status=status_filter, category=category_filter, branch=branch_filter, date_from=date_from, date_to=date_to) }}">{{ page_num }}</a>
+                    </li>
+                  {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                  {% endif %}
+                {% endfor %}
+                
+                {% if expenses.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="{{ url_for('expenses', page=expenses.next_num, status=status_filter, category=category_filter, branch=branch_filter, date_from=date_from, date_to=date_to) }}">Next</a>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          {% endif %}
+        {% else %}
+          <div class="text-center py-5">
+            <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No expenses found</h5>
+            <p class="text-muted">Start by adding your first expense.</p>
+            <a href="{{ url_for('add_expense') }}" class="btn btn-primary">
+              <i class="fas fa-plus"></i> Add Expense
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} 

@@ -34,7 +34,7 @@ login_manager.init_app(app)
 login_manager.login_view = 'login_post'
 
 # Import models after db is initialized
-from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription
+from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription, Expense
 
 # Define EAT timezone
 EAT = timezone(timedelta(hours=3))
@@ -131,6 +131,15 @@ def index():
         func.sum(OrderItem.quantity).desc()
     ).limit(5).all()
     
+    # Expense statistics
+    total_expenses = Expense.query.count()
+    pending_expenses = Expense.query.filter_by(status='pending').count()
+    approved_expenses = Expense.query.filter_by(status='approved').count()
+    total_expense_amount = db.session.query(func.sum(Expense.amount)).filter_by(status='approved').scalar() or 0
+    monthly_expenses = db.session.query(func.sum(Expense.amount)).filter(
+        and_(Expense.status == 'approved', Expense.expense_date >= this_month)
+    ).scalar() or 0
+    
     return render_template("index.html", 
                          total_users=total_users,
                          total_products=total_products,
@@ -144,7 +153,12 @@ def index():
                          recent_orders_list=recent_orders_list,
                          recent_users=recent_users,
                          branch_stats=branch_stats,
-                         top_products=top_products)
+                         top_products=top_products,
+                         total_expenses=total_expenses,
+                         pending_expenses=pending_expenses,
+                         approved_expenses=approved_expenses,
+                         total_expense_amount=total_expense_amount,
+                         monthly_expenses=monthly_expenses)
 
 @app.route("/login", methods=["GET", "POST"])
 def login_post():
@@ -1691,6 +1705,218 @@ def delete_product_description(description_id):
         db.session.rollback()
         flash('An error occurred while deleting the description. Please try again.', 'error')
         return redirect(url_for('product_descriptions', product_id=description.product_id))
+
+
+# Expense Management Routes
+@app.route('/expenses')
+@login_required
+@role_required(['admin'])
+def expenses():
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    
+    # Get filter parameters
+    status_filter = request.args.get('status', '')
+    category_filter = request.args.get('category', '')
+    branch_filter = request.args.get('branch', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
+    # Build query
+    query = Expense.query
+    
+    if status_filter:
+        query = query.filter(Expense.status == status_filter)
+    if category_filter:
+        query = query.filter(Expense.category == category_filter)
+    if branch_filter:
+        query = query.filter(Expense.branch_id == int(branch_filter))
+    if date_from:
+        query = query.filter(Expense.expense_date >= date_from)
+    if date_to:
+        query = query.filter(Expense.expense_date <= date_to)
+    
+    # Order by date (newest first)
+    expenses = query.order_by(Expense.expense_date.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Get unique categories and branches for filters
+    categories = db.session.query(Expense.category).distinct().all()
+    categories = [cat[0] for cat in categories]
+    
+    return render_template('expenses.html', 
+                         expenses=expenses,
+                         categories=categories,
+                         status_filter=status_filter,
+                         category_filter=category_filter,
+                         branch_filter=branch_filter,
+                         date_from=date_from,
+                         date_to=date_to)
+
+
+@app.route('/add_expense', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_expense():
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title')
+            description = request.form.get('description')
+            amount = request.form.get('amount')
+            category = request.form.get('category')
+            expense_date = request.form.get('expense_date')
+            payment_method = request.form.get('payment_method')
+            branch_id = request.form.get('branch_id')
+            
+            # Validation
+            if not all([title, amount, category, expense_date]):
+                flash('Please fill in all required fields.', 'danger')
+                return redirect(url_for('add_expense'))
+            
+            # Handle receipt upload
+            receipt_url = None
+            if 'receipt' in request.files:
+                file = request.files['receipt']
+                if file and file.filename:
+                    receipt_url = upload_to_cloudinary(file)
+            
+            # Create expense
+            expense = Expense(
+                title=title,
+                description=description,
+                amount=amount,
+                category=category,
+                expense_date=datetime.strptime(expense_date, '%Y-%m-%d').date(),
+                payment_method=payment_method,
+                receipt_url=receipt_url,
+                branch_id=int(branch_id) if branch_id else None,
+                user_id=current_user.id
+            )
+            
+            db.session.add(expense)
+            db.session.commit()
+            
+            flash('Expense added successfully!', 'success')
+            return redirect(url_for('expenses'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding expense: {str(e)}', 'danger')
+            return redirect(url_for('add_expense'))
+    
+    return render_template('add_expense.html')
+
+
+@app.route('/edit_expense/<int:id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_expense(id):
+    expense = Expense.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            expense.title = request.form.get('title')
+            expense.description = request.form.get('description')
+            expense.amount = request.form.get('amount')
+            expense.category = request.form.get('category')
+            expense.expense_date = datetime.strptime(request.form.get('expense_date'), '%Y-%m-%d').date()
+            expense.payment_method = request.form.get('payment_method')
+            expense.branch_id = int(request.form.get('branch_id')) if request.form.get('branch_id') else None
+            
+            # Handle receipt upload
+            if 'receipt' in request.files:
+                file = request.files['receipt']
+                if file and file.filename:
+                    # Delete old receipt if exists
+                    if expense.receipt_url:
+                        delete_from_cloudinary(expense.receipt_url)
+                    expense.receipt_url = upload_to_cloudinary(file)
+            
+            db.session.commit()
+            flash('Expense updated successfully!', 'success')
+            return redirect(url_for('expenses'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating expense: {str(e)}', 'danger')
+    
+    return render_template('edit_expense.html', expense=expense)
+
+
+@app.route('/approve_expense/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def approve_expense(id):
+    expense = Expense.query.get_or_404(id)
+    
+    try:
+        expense.status = 'approved'
+        expense.approved_by = current_user.id
+        expense.approval_notes = request.form.get('approval_notes', '')
+        expense.updated_at = datetime.now(EAT)
+        
+        db.session.commit()
+        flash('Expense approved successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error approving expense: {str(e)}', 'danger')
+    
+    return redirect(url_for('expenses'))
+
+
+@app.route('/reject_expense/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def reject_expense(id):
+    expense = Expense.query.get_or_404(id)
+    
+    try:
+        expense.status = 'rejected'
+        expense.approved_by = current_user.id
+        expense.approval_notes = request.form.get('approval_notes', '')
+        expense.updated_at = datetime.now(EAT)
+        
+        db.session.commit()
+        flash('Expense rejected successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error rejecting expense: {str(e)}', 'danger')
+    
+    return redirect(url_for('expenses'))
+
+
+@app.route('/delete_expense/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_expense(id):
+    expense = Expense.query.get_or_404(id)
+    
+    try:
+        # Delete receipt image if exists
+        if expense.receipt_url:
+            delete_from_cloudinary(expense.receipt_url)
+        
+        db.session.delete(expense)
+        db.session.commit()
+        flash('Expense deleted successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting expense: {str(e)}', 'danger')
+    
+    return redirect(url_for('expenses'))
+
+
+@app.route('/expense_details/<int:id>')
+@login_required
+@role_required(['admin'])
+def expense_details(id):
+    expense = Expense.query.get_or_404(id)
+    return render_template('expense_details.html', expense=expense)
+
 
 # Error handlers
 @app.errorhandler(IntegrityError)

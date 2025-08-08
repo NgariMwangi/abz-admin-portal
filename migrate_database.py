@@ -101,6 +101,42 @@ def migrate_database():
             else:
                 print("✅ product_descriptions table already exists")
             
+            # Add expenses table
+            print("📋 Checking if expenses table exists...")
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'expenses'
+            """))
+            
+            if not result.fetchone():
+                print("➕ Creating expenses table...")
+                db.session.execute(text("""
+                    CREATE TABLE expenses (
+                        id SERIAL PRIMARY KEY,
+                        title VARCHAR NOT NULL,
+                        description TEXT,
+                        amount DECIMAL(10,2) NOT NULL,
+                        category VARCHAR NOT NULL,
+                        expense_date DATE NOT NULL,
+                        payment_method VARCHAR,
+                        receipt_url VARCHAR,
+                        branch_id INTEGER,
+                        user_id INTEGER NOT NULL,
+                        approved_by INTEGER,
+                        status VARCHAR DEFAULT 'pending',
+                        approval_notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (branch_id) REFERENCES branch (id),
+                        FOREIGN KEY (user_id) REFERENCES users (id),
+                        FOREIGN KEY (approved_by) REFERENCES users (id)
+                    )
+                """))
+                print("✅ expenses table created")
+            else:
+                print("✅ expenses table already exists")
+            
             db.session.commit()
             print("🎉 Database migration completed successfully!")
             
