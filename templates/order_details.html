@@ -132,7 +132,7 @@
             
             <div class="mb-3">
               <small class="text-muted">Total Amount</small>
-              <div class="fw-bold fs-4 text-primary">${{ "%.2f"|format(total_amount) }}</div>
+              <div class="fw-bold fs-4 text-primary">KSh {{ "%.2f"|format(total_amount) }}</div>
             </div>
             
             <div class="d-grid gap-2">
@@ -205,7 +205,7 @@
                     </td>
                     <td>
                       {% if item.product and item.product.sellingprice %}
-                      <strong>${{ "%.2f"|format(item.product.sellingprice) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(item.product.sellingprice) }}</strong>
                       {% else %}
                       <span class="text-muted">N/A</span>
                       {% endif %}
@@ -215,7 +215,7 @@
                     </td>
                     <td>
                       {% if item.product and item.product.sellingprice %}
-                      <strong>${{ "%.2f"|format(item.product.sellingprice * item.quantity) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(item.product.sellingprice * item.quantity) }}</strong>
                       {% else %}
                       <span class="text-muted">N/A</span>
                       {% endif %}
@@ -226,7 +226,7 @@
                 <tfoot>
                   <tr class="table-active">
                     <td colspan="4" class="text-end fw-bold">Total:</td>
-                    <td class="fw-bold fs-5 text-primary">${{ "%.2f"|format(total_amount) }}</td>
+                    <td class="fw-bold fs-5 text-primary">KSh {{ "%.2f"|format(total_amount) }}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -276,7 +276,7 @@
                       <strong>#{{ payment.id }}</strong>
                     </td>
                     <td>
-                      <strong>${{ "%.2f"|format(payment.amount) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(payment.amount) }}</strong>
                     </td>
                     <td>
                       <span class="badge badge-info">{{ payment.payment_method }}</span>

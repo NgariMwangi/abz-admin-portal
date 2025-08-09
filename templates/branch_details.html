@@ -64,7 +64,7 @@
                   </div>
                   <div class="col-6">
                     <div class="text-center mb-3">
-                      <div class="fw-bold text-success fs-4">${{ "%.0f"|format(branch_revenue) }}</div>
+                      <div class="fw-bold text-success fs-4">KSh {{ "%.0f"|format(branch_revenue) }}</div>
                       <small class="text-muted">Revenue</small>
                     </div>
                   </div>
@@ -169,7 +169,7 @@
                     </td>
                     <td>
                       {% if product.sellingprice %}
-                      <strong>${{ "%.2f"|format(product.sellingprice) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(product.sellingprice) }}</strong>
                       {% else %}
                       <span class="text-muted">N/A</span>
                       {% endif %}
@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '$' + value.toLocaleString();
+                            return 'KSh ' + value.toLocaleString();
                         }
                     }
                 }

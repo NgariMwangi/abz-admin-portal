@@ -125,7 +125,7 @@
                           {% set total = total + (item.product.sellingprice * item.quantity) %}
                         {% endif %}
                       {% endfor %}
-                      <strong>${{ "%.2f"|format(total) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(total) }}</strong>
                     </td>
                     <td>
                       {% if order.approvalstatus %}

@@ -124,7 +124,7 @@
               <div class="col-6">
                 <div class="text-center">
                   <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
-                    <i class="fas fa-dollar-sign"></i>
+                    <i class="fas fa-money-bill-wave"></i>
                   </div>
                   <h4 class="card-title">
                     {% set category_revenue = 0 %}
@@ -135,7 +135,7 @@
                         {% endif %}
                       {% endfor %}
                     {% endfor %}
-                    ${{ "%.0f"|format(category_revenue) }}
+                    KSh {{ "%.0f"|format(category_revenue) }}
                   </h4>
                   <p class="card-category">Revenue</p>
                 </div>

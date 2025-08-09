@@ -81,7 +81,7 @@
                           {% endfor %}
                         {% endif %}
                       {% endfor %}
-                      <strong>${{ "%.2f"|format(branch_revenue) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(branch_revenue) }}</strong>
                     </td>
                     <td>
                       <div class="btn-group" role="group">
@@ -218,7 +218,7 @@
         <div class="card card-round">
           <div class="card-body text-center">
             <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
-              <i class="fas fa-dollar-sign"></i>
+              <i class="fas fa-money-bill-wave"></i>
             </div>
             <h4 class="card-title">
               {% set total_revenue = 0 %}
@@ -233,7 +233,7 @@
                   {% endif %}
                 {% endfor %}
               {% endfor %}
-              ${{ "%.0f"|format(total_revenue) }}
+              KSh {{ "%.0f"|format(total_revenue) }}
             </h4>
             <p class="card-category">Total Revenue</p>
           </div>
