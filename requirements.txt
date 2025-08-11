@@ -12,6 +12,7 @@ Jinja2==3.1.6
 MarkupSafe==3.0.2
 psycopg2==2.9.10
 python-dotenv==1.1.0
+reportlab==4.0.4
 six==1.17.0
 SQLAlchemy==2.0.41
 typing_extensions==4.13.2

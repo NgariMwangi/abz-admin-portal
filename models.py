@@ -297,14 +297,14 @@ class PurchaseOrderItem(db.Model):
     __tablename__ = 'purchase_order_items'
     id = db.Column(db.Integer, primary_key=True)
     purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    product_code = db.Column(db.String, nullable=False)  # User manually types product code
+    product_name = db.Column(db.String, nullable=True)   # User manually types product name
     quantity = db.Column(db.Integer, nullable=False)
-    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
-    total_price = db.Column(db.Numeric(10, 2), nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, filled when invoice received
+    total_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, calculated when prices are set
     received_quantity = db.Column(db.Integer, nullable=False, default=0)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
     
-    # Relationships
-    product = db.relationship('Product', backref='purchase_order_items', lazy=True)
+    # No relationship to Product - items are manually entered

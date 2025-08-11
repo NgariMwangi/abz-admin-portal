@@ -1,0 +1,203 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="page-inner">
+  <div class="page-header">
+    <h4 class="page-title">Edit Purchase Order Item</h4>
+    <ul class="breadcrumbs">
+      <li class="nav-home">
+        <a href="{{ url_for('index') }}">
+          <i class="flaticon-home"></i>
+        </a>
+      </li>
+      <li class="separator">
+        <i class="flaticon-right-arrow"></i>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('purchase_orders') }}">Purchase Orders</a>
+      </li>
+      <li class="separator">
+        <i class="flaticon-right-arrow"></i>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('edit_purchase_order', id=po.id) }}">Edit PO: {{ po.po_number }}</a>
+      </li>
+      <li class="separator">
+        <i class="flaticon-right-arrow"></i>
+      </li>
+      <li class="nav-item">
+        <a href="#">Edit Item: {{ po_item.product_name or po_item.product_code or 'Item' }}</a>
+      </li>
+    </ul>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card card-round">
+        <div class="card-header">
+          <h4 class="card-title">Edit Purchase Order Item</h4>
+          <p class="card-category">Update item details for Purchase Order: {{ po.po_number }}</p>
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="product_code" class="form-label">Product Code *</label>
+                  <input type="text" class="form-control" id="product_code" name="product_code"
+                    value="{{ po_item.product_code or '' }}" required>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="product_name" class="form-label">Product Name *</label>
+                  <input type="text" class="form-control" id="product_name" name="product_name"
+                    value="{{ po_item.product_name or '' }}" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="quantity" class="form-label">Quantity *</label>
+                  <input type="number" class="form-control" id="quantity" name="quantity"
+                    value="{{ po_item.quantity or 0 }}" min="1" required>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="unit_price" class="form-label">Unit Price (KSh)</label>
+                  <input type="number" class="form-control" id="unit_price" name="unit_price"
+                    value="{{ po_item.unit_price or '' }}" step="0.01" min="0">
+                  <small class="form-text text-muted">Leave empty if price is not yet determined</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="notes" class="form-label">Notes</label>
+              <textarea class="form-control" id="notes" name="notes" rows="3">{{ po_item.notes or '' }}</textarea>
+            </div>
+
+            <div class="d-flex justify-content-between">
+              <a href="{{ url_for('edit_purchase_order', id=po.id) }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Purchase Order
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Update Item
+              </button>
+            </div>
+
+            <!-- Total Price Preview -->
+            <div class="mt-3 p-3 bg-light rounded">
+              <strong>Total Price Preview:</strong>
+              <span id="totalPricePreview" class="text-primary fw-bold">
+                KSh {{ "{:,.2f}".format(po_item.total_price) if po_item.total_price else '0.00' }}
+              </span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card card-round">
+        <div class="card-header">
+          <h4 class="card-title">Item Information</h4>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <strong>Current Values:</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Product Code:</small><br>
+            <strong>{{ po_item.product_code or 'Not set' }}</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Product Name:</small><br>
+            <strong>{{ po_item.product_name or 'Not set' }}</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Quantity:</small><br>
+            <strong>{{ po_item.quantity or 0 }}</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Unit Price:</small><br>
+            <strong>KSh {{ "{:,.2f}".format(po_item.unit_price) if po_item.unit_price else 'Not set' }}</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Total Price:</small><br>
+            <strong>KSh {{ "{:,.2f}".format(po_item.total_price) if po_item.total_price else 'Not calculated'
+              }}</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Notes:</small><br>
+            <strong>{{ po_item.notes or 'No notes' }}</strong>
+          </div>
+
+          <hr>
+
+          <div class="mb-3">
+            <strong>Purchase Order Details:</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">PO Number:</small><br>
+            <strong>{{ po.po_number }}</strong>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Status:</small><br>
+            {% if po.status == 'draft' %}
+            <span class="badge bg-secondary">Draft</span>
+            {% elif po.status == 'approved' %}
+            <span class="badge bg-info">Approved</span>
+            {% elif po.status == 'submitted' %}
+            <span class="badge bg-warning">Submitted</span>
+            {% elif po.status == 'ordered' %}
+            <span class="badge bg-primary">Ordered</span>
+            {% elif po.status == 'received' %}
+            <span class="badge bg-success">Received</span>
+            {% elif po.status == 'cancelled' %}
+            <span class="badge bg-danger">Cancelled</span>
+            {% endif %}
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Created:</small><br>
+            <strong>{{ po.created_at.strftime('%Y-%m-%d') if po.created_at else 'N/A' }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const quantityInput = document.getElementById('quantity');
+    const unitPriceInput = document.getElementById('unit_price');
+    const totalPricePreview = document.getElementById('totalPricePreview');
+
+    function calculateTotal() {
+      const quantity = parseFloat(quantityInput.value) || 0;
+      const unitPrice = parseFloat(unitPriceInput.value) || 0;
+      const total = quantity * unitPrice;
+
+      if (total > 0) {
+        totalPricePreview.textContent = 'KSh ' + total.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+      } else {
+        totalPricePreview.textContent = 'KSh 0.00';
+      }
+    }
+
+    // Calculate total when quantity or unit price changes
+    quantityInput.addEventListener('input', calculateTotal);
+    unitPriceInput.addEventListener('input', calculateTotal);
+
+    // Initial calculation
+    calculateTotal();
+  });
+</script>
+{% endblock %}

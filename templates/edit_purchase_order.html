@@ -9,6 +9,9 @@
         <h6 class="op-7 mb-2">Purchase Order: {{ po.po_number }}</h6>
       </div>
       <div class="ms-md-auto py-2 py-md-0">
+        <a href="{{ url_for('export_purchase_order_pdf', po_id=po.id) }}" class="btn btn-success btn-round me-2">
+          <i class="fas fa-file-pdf"></i> Export PDF
+        </a>
         <a href="{{ url_for('purchase_orders') }}" class="btn btn-secondary btn-round">
           <i class="fas fa-arrow-left"></i> Back to Purchase Orders
         </a>
@@ -70,7 +73,7 @@
                   <div class="mb-3">
                     <label for="order_date" class="form-label">Order Date *</label>
                     <input type="date" class="form-control" id="order_date" name="order_date" 
-                           value="{{ po.order_date.strftime('%Y-%m-%d') }}" required>
+                           value="{{ po.order_date.strftime('%Y-%m-%d') if po.order_date else '' }}" required>
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -148,26 +151,30 @@
                 <tbody>
                   {% for item in po.items %}
                   <tr>
+                                            <td>
+                          <div class="fw-bold">{{ item.product_name or 'N/A' }}</div>
+                          <small class="text-muted">{{ item.product_code or 'No code' }}</small>
+                        </td>
+                    <td>{{ item.quantity if item.quantity else '0' }}</td>
+                    <td>KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'N/A' }}</td>
                     <td>
-                      <div class="fw-bold">{{ item.product.name }}</div>
-                      <small class="text-muted">{{ item.product.productcode or 'No code' }}</small>
-                    </td>
-                    <td>{{ item.quantity }}</td>
-                    <td>KSh {{ "{:,.0f}".format(item.unit_price) }}</td>
-                    <td>
-                      <strong>KSh {{ "{:,.0f}".format(item.total_price) }}</strong>
+                      <strong>KSh {{ "{:,.0f}".format(item.total_price) if item.total_price else 'N/A' }}</strong>
                     </td>
                     <td>
                       {% if po.status == 'received' %}
-                        <span class="badge bg-success">{{ item.received_quantity }}/{{ item.quantity }}</span>
+                        <span class="badge bg-success">{{ item.received_quantity if item.received_quantity else 0 }}/{{ item.quantity if item.quantity else 0 }}</span>
                       {% else %}
-                        <span class="badge bg-secondary">{{ item.received_quantity }}/{{ item.quantity }}</span>
+                        <span class="badge bg-secondary">{{ item.received_quantity if item.received_quantity else 0 }}/{{ item.quantity if item.quantity else 0 }}</span>
                       {% endif %}
                     </td>
                     <td>
                       {% if po.status in ['draft', 'submitted'] %}
+                        <a href="{{ url_for('edit_po_item', item_id=item.id) }}" 
+                           class="btn btn-sm btn-primary me-1" title="Edit Item">
+                          <i class="fas fa-edit"></i>
+                        </a>
                         <button type="button" class="btn btn-sm btn-danger" 
-                                data-bs-toggle="modal" data-bs-target="#deleteItemModal{{ item.id }}">
+                                data-bs-toggle="modal" data-bs-target="#deleteItemModal{{ item.id }}" title="Delete Item">
                           <i class="fas fa-trash"></i>
                         </button>
                       {% endif %}
@@ -191,15 +198,18 @@
               <h5>Add Item</h5>
               <form action="{{ url_for('add_po_item', po_id=po.id) }}" method="POST">
                 <div class="row">
+                  <div class="col-md-2">
+                    <div class="mb-3">
+                      <label for="product_code" class="form-label">Product Code *</label>
+                      <input type="text" class="form-control" id="product_code" name="product_code" 
+                             placeholder="e.g. HW001" required>
+                    </div>
+                  </div>
                   <div class="col-md-3">
                     <div class="mb-3">
-                      <label for="product_id" class="form-label">Product *</label>
-                      <select class="form-control" id="product_id" name="product_id" required>
-                        <option value="">Select Product</option>
-                        {% for product in products %}
-                          <option value="{{ product.id }}">{{ product.name }}</option>
-                        {% endfor %}
-                      </select>
+                      <label for="product_name" class="form-label">Product Name *</label>
+                      <input type="text" class="form-control" id="product_name" name="product_name" 
+                             placeholder="e.g. Steel Bolts" required>
                     </div>
                   </div>
                   <div class="col-md-2">
@@ -209,14 +219,14 @@
                              min="1" required>
                     </div>
                   </div>
-                  <div class="col-md-3">
+                  <div class="col-md-2">
                     <div class="mb-3">
-                      <label for="unit_price" class="form-label">Unit Price (KSh) *</label>
+                      <label for="unit_price" class="form-label">Unit Price (KSh)</label>
                       <input type="number" class="form-control" id="unit_price" name="unit_price" 
-                             step="0.01" min="0" required>
+                             step="0.01" min="0" placeholder="Optional">
                     </div>
                   </div>
-                  <div class="col-md-3">
+                  <div class="col-md-2">
                     <div class="mb-3">
                       <label for="notes" class="form-label">Notes</label>
                       <input type="text" class="form-control" id="notes" name="notes">
@@ -271,14 +281,14 @@
               {% endif %}
             </div>
             <div class="mb-3">
-              <strong>Created By:</strong> {{ po.user.firstname }} {{ po.user.lastname }}
+              <strong>Created By:</strong> {{ po.user.firstname if po.user and po.user.firstname else 'N/A' }} {{ po.user.lastname if po.user and po.user.lastname else '' }}
             </div>
             <div class="mb-3">
-              <strong>Created:</strong> {{ po.created_at.strftime('%Y-%m-%d') }}
+              <strong>Created:</strong> {{ po.created_at.strftime('%Y-%m-%d') if po.created_at else 'N/A' }}
             </div>
-            {% if po.approved_by %}
+            {% if po.approved_by and po.approver %}
             <div class="mb-3">
-              <strong>Approved By:</strong> {{ po.approver.firstname }} {{ po.approver.lastname }}
+              <strong>Approved By:</strong> {{ po.approver.firstname if po.approver.firstname else 'N/A' }} {{ po.approver.lastname if po.approver.lastname else '' }}
             </div>
             {% endif %}
           </div>
@@ -290,16 +300,16 @@
           </div>
           <div class="card-body">
             <div class="mb-3">
-              <strong>Subtotal:</strong> KSh {{ "{:,.0f}".format(po.subtotal) }}
+              <strong>Subtotal:</strong> KSh {{ "{:,.0f}".format(po.subtotal) if po.subtotal else '0' }}
             </div>
             <div class="mb-3">
-              <strong>Tax:</strong> KSh {{ "{:,.0f}".format(po.tax_amount) }}
+              <strong>Tax:</strong> KSh {{ "{:,.0f}".format(po.tax_amount) if po.tax_amount else '0' }}
             </div>
             <div class="mb-3">
-              <strong>Discount:</strong> KSh {{ "{:,.0f}".format(po.discount_amount) }}
+              <strong>Discount:</strong> KSh {{ "{:,.0f}".format(po.discount_amount) if po.discount_amount else '0' }}
             </div>
             <div class="mb-3">
-              <strong class="text-primary">Total:</strong> KSh {{ "{:,.0f}".format(po.total_amount) }}
+              <strong class="text-primary">Total:</strong> KSh {{ "{:,.0f}".format(po.total_amount) if po.total_amount else '0' }}
             </div>
           </div>
         </div>
@@ -314,11 +324,11 @@
               {% for item in po.items %}
               <div class="mb-3">
                 <label for="received_qty_{{ item.id }}" class="form-label">
-                  {{ item.product.name }} ({{ item.quantity }} ordered)
+                  {{ item.product_name or 'N/A' }} ({{ item.quantity if item.quantity else 0 }} ordered)
                 </label>
                 <input type="number" class="form-control" id="received_qty_{{ item.id }}" 
-                       name="received_qty_{{ item.id }}" min="0" max="{{ item.quantity }}" 
-                       value="{{ item.received_quantity }}">
+                       name="received_qty_{{ item.id }}" min="0" max="{{ item.quantity if item.quantity else 0 }}" 
+                       value="{{ item.received_quantity if item.received_quantity else 0 }}">
               </div>
               {% endfor %}
               <button type="submit" class="btn btn-success btn-block w-100">
@@ -345,7 +355,7 @@
       </div>
       <div class="modal-body">
         <p>Are you sure you want to delete this item?</p>
-        <p><strong>{{ item.product.name }}</strong> - {{ item.quantity }} units</p>
+                        <p><strong>{{ item.product_name or 'N/A' }}</strong> - {{ item.quantity if item.quantity else 0 }} units</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

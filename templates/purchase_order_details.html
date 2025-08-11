@@ -42,14 +42,14 @@
               <div class="col-md-6">
                 <h6>Basic Information</h6>
                 <p><strong>PO Number:</strong> {{ po.po_number }}</p>
-                <p><strong>Supplier:</strong> {{ po.supplier.name }}</p>
-                <p><strong>Branch:</strong> {{ po.branch.name }}</p>
-                <p><strong>Order Date:</strong> {{ po.order_date.strftime('%B %d, %Y') }}</p>
+                <p><strong>Supplier:</strong> {{ po.supplier.name if po.supplier else 'Not set' }}</p>
+                <p><strong>Branch:</strong> {{ po.branch.name if po.branch else 'Not set' }}</p>
+                <p><strong>Order Date:</strong> {{ po.order_date.strftime('%B %d, %Y') if po.order_date else 'Not set' }}</p>
                 {% if po.expected_delivery_date %}
-                  <p><strong>Expected Delivery:</strong> {{ po.expected_delivery_date.strftime('%B %d, %Y') }}</p>
+                  <p><strong>Expected Delivery:</strong> {{ po.expected_delivery_date.strftime('%B %d, %Y') if po.expected_delivery_date else 'Not set' }}</p>
                 {% endif %}
                 {% if po.delivery_date %}
-                  <p><strong>Actual Delivery:</strong> {{ po.delivery_date.strftime('%B %d, %Y') }}</p>
+                  <p><strong>Actual Delivery:</strong> {{ po.delivery_date.strftime('%B %d, %Y') if po.delivery_date else 'Not set' }}</p>
                 {% endif %}
               </div>
               <div class="col-md-6">
@@ -81,8 +81,8 @@
                 {% if po.payment_method %}
                   <p><strong>Payment Method:</strong> {{ po.payment_method|title }}</p>
                 {% endif %}
-                <p><strong>Created By:</strong> {{ po.user.firstname }} {{ po.user.lastname }}</p>
-                <p><strong>Created:</strong> {{ po.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                <p><strong>Created By:</strong> {{ po.user.firstname }} {{ po.user.lastname if po.user else 'Unknown User' }}</p>
+                <p><strong>Created:</strong> {{ po.created_at.strftime('%B %d, %Y at %I:%M %p') if po.created_at else 'Not set' }}</p>
               </div>
             </div>
             {% if po.notes %}
@@ -118,18 +118,18 @@
                 <tbody>
                   {% for item in po.items %}
                   <tr>
-                    <td>
-                      <div class="fw-bold">{{ item.product.name }}</div>
-                      <small class="text-muted">{{ item.product.productcode or 'No code' }}</small>
-                    </td>
+                                            <td>
+                          <div class="fw-bold">{{ item.product_name or 'N/A' }}</div>
+                          <small class="text-muted">{{ item.product_code or 'No code' }}</small>
+                        </td>
                     <td>
                       <span class="badge bg-light text-dark">{{ item.quantity }}</span>
                     </td>
                     <td>
-                      <strong class="text-primary">KSh {{ "{:,.0f}".format(item.unit_price) }}</strong>
+                      <strong class="text-primary">KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'Not set' }}</strong>
                     </td>
                     <td>
-                      <strong class="text-success">KSh {{ "{:,.0f}".format(item.total_price) }}</strong>
+                      <strong class="text-success">KSh {{ "{:,.0f}".format(item.total_price) if item.total_price else 'Not calculated' }}</strong>
                     </td>
                     <td>
                       {% if po.status == 'received' %}
@@ -173,7 +173,7 @@
                 <strong>Subtotal:</strong>
               </div>
               <div class="col-4 text-end">
-                <strong>KSh {{ "{:,.0f}".format(po.subtotal) }}</strong>
+                <strong>KSh {{ "{:,.0f}".format(po.subtotal) if po.subtotal else '0' }}</strong>
               </div>
             </div>
             <div class="row mb-3">
@@ -181,7 +181,7 @@
                 <strong>Tax Amount:</strong>
               </div>
               <div class="col-4 text-end">
-                <strong class="text-danger">+ KSh {{ "{:,.0f}".format(po.tax_amount) }}</strong>
+                <strong class="text-danger">+ KSh {{ "{:,.0f}".format(po.tax_amount) if po.tax_amount else '0' }}</strong>
               </div>
             </div>
             <div class="row mb-3">
@@ -189,7 +189,7 @@
                 <strong>Discount:</strong>
               </div>
               <div class="col-4 text-end">
-                <strong class="text-success">- KSh {{ "{:,.0f}".format(po.discount_amount) }}</strong>
+                <strong class="text-success">- KSh {{ "{:,.0f}".format(po.discount_amount) if po.discount_amount else '0' }}</strong>
               </div>
             </div>
             <hr>
@@ -198,7 +198,7 @@
                 <strong class="text-primary fs-5">Total Amount:</strong>
               </div>
               <div class="col-4 text-end">
-                <strong class="text-primary fs-5">KSh {{ "{:,.0f}".format(po.total_amount) }}</strong>
+                <strong class="text-primary fs-5">KSh {{ "{:,.0f}".format(po.total_amount) if po.total_amount else '0' }}</strong>
               </div>
             </div>
           </div>
@@ -216,18 +216,18 @@
               <ul class="list-unstyled mt-2">
                 {% for item in po.items %}
                 <li class="mb-1">
-                  <small>{{ item.product.name }}: {{ item.quantity }} × KSh {{ "{:,.0f}".format(item.unit_price) }} = KSh {{ "{:,.0f}".format(item.total_price) }}</small>
+                  <small>{{ item.product_name or 'N/A' }}: {{ item.quantity }} × KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'Not set' }} = KSh {{ "{:,.0f}".format(item.total_price) if item.total_price else 'Not set' }}</small>
                 </li>
                 {% endfor %}
               </ul>
             </div>
             <div class="mb-3">
               <strong>Average Item Cost:</strong>
-              <div class="text-primary">KSh {{ "{:,.0f}".format(po.subtotal / po.items|length) }}</div>
+              <div class="text-primary">KSh {{ "{:,.0f}".format(po.subtotal / po.items|length) if po.subtotal and po.items|length > 0 else '0' }}</div>
             </div>
             <div class="mb-3">
               <strong>Tax Rate:</strong>
-              {% if po.subtotal > 0 %}
+              {% if po.subtotal and po.subtotal > 0 and po.tax_amount %}
                 <div class="text-danger">{{ "%.1f".format((po.tax_amount / po.subtotal) * 100) }}%</div>
               {% else %}
                 <div class="text-muted">0%</div>
@@ -235,7 +235,7 @@
             </div>
             <div class="mb-3">
               <strong>Discount Rate:</strong>
-              {% if po.subtotal > 0 %}
+              {% if po.subtotal and po.subtotal > 0 and po.discount_amount %}
                 <div class="text-success">{{ "%.1f".format((po.discount_amount / po.subtotal) * 100) }}%</div>
               {% else %}
                 <div class="text-muted">0%</div>
@@ -248,12 +248,13 @@
         </div>
 
         <!-- Supplier Information -->
+        {% if po.supplier %}
         <div class="card card-round mt-3">
           <div class="card-header">
             <h4 class="card-title">Supplier Information</h4>
           </div>
           <div class="card-body">
-            <p><strong>Name:</strong> {{ po.supplier.name }}</p>
+            <p><strong>Name:</strong> {{ po.supplier.name if po.supplier.name else 'Not set' }}</p>
             {% if po.supplier.contact_person %}
               <p><strong>Contact:</strong> {{ po.supplier.contact_person }}</p>
             {% endif %}
@@ -267,20 +268,21 @@
               <p><strong>Payment Terms:</strong> {{ po.supplier.payment_terms }}</p>
             {% endif %}
             {% if po.supplier.credit_limit %}
-              <p><strong>Credit Limit:</strong> KSh {{ "{:,.0f}".format(po.supplier.credit_limit) }}</p>
+              <p><strong>Credit Limit:</strong> KSh {{ "{:,.0f}".format(po.supplier.credit_limit) if po.supplier.credit_limit else '0' }}</p>
             {% endif %}
           </div>
         </div>
+        {% endif %}
 
         <!-- Approval Information -->
-        {% if po.approved_by %}
+        {% if po.approved_by and po.approver %}
         <div class="card card-round mt-3">
           <div class="card-header">
             <h4 class="card-title">Approval Information</h4>
           </div>
           <div class="card-body">
             <p><strong>Approved By:</strong> {{ po.approver.firstname }} {{ po.approver.lastname }}</p>
-            <p><strong>Approved On:</strong> {{ po.approved_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+            <p><strong>Approved On:</strong> {{ po.approved_at.strftime('%B %d, %Y at %I:%M %p') if po.approved_at else 'Not set' }}</p>
           </div>
         </div>
         {% endif %}

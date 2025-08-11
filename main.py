@@ -1,6 +1,13 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from decimal import Decimal
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from io import BytesIO
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -2268,51 +2275,194 @@ def add_purchase_order():
 @login_required
 @role_required(['admin'])
 def edit_purchase_order(id):
-    po = PurchaseOrder.query.get_or_404(id)
-    
-    if request.method == 'POST':
-        try:
-            supplier_id = request.form.get('supplier_id')
-            branch_id = request.form.get('branch_id')
-            order_date = request.form.get('order_date')
-            expected_delivery_date = request.form.get('expected_delivery_date')
-            notes = request.form.get('notes')
-            status = request.form.get('status')
-            
-            if not supplier_id or not branch_id or not order_date:
-                flash('Supplier, Branch, and Order Date are required', 'error')
-                return redirect(url_for('edit_purchase_order', id=id))
-            
-            po.supplier_id = supplier_id
-            po.branch_id = branch_id
-            po.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
-            po.expected_delivery_date = datetime.strptime(expected_delivery_date, '%Y-%m-%d').date() if expected_delivery_date else None
-            po.notes = notes
-            
-            if status and status != po.status:
-                po.status = status
-                if status == 'approved':
-                    po.approved_by = current_user.id
-                    po.approved_at = datetime.now(EAT)
-            
-            db.session.commit()
-            flash('Purchase Order updated successfully', 'success')
+    try:
+        print(f"🔍 Attempting to access edit_purchase_order for ID: {id}")
+        print(f"🔍 Current user: {current_user.email if current_user.is_authenticated else 'Not authenticated'}")
+        print(f"🔍 User role: {current_user.role if current_user.is_authenticated else 'No role'}")
+        
+        # Check if purchase order exists
+        po = PurchaseOrder.query.get(id)
+        if not po:
+            print(f"❌ Purchase Order with ID {id} not found in database")
+            flash(f'Purchase Order with ID {id} not found.', 'error')
             return redirect(url_for('purchase_orders'))
+        
+        print(f"✅ Found Purchase Order: {po.po_number} (ID: {po.id})")
+        print(f"✅ PO Status: {po.status}")
+        print(f"✅ PO Supplier ID: {po.supplier_id}")
+        print(f"✅ PO Branch ID: {po.branch_id}")
+        
+        if request.method == 'POST':
+            try:
+                print(f"📝 Processing POST request for PO {id}")
+                supplier_id = request.form.get('supplier_id')
+                branch_id = request.form.get('branch_id')
+                order_date = request.form.get('order_date')
+                expected_delivery_date = request.form.get('expected_delivery_date')
+                notes = request.form.get('notes')
+                status = request.form.get('status')
+                
+                print(f"📝 Form data received:")
+                print(f"   - supplier_id: {supplier_id}")
+                print(f"   - branch_id: {branch_id}")
+                print(f"   - order_date: {order_date}")
+                print(f"   - expected_delivery_date: {expected_delivery_date}")
+                print(f"   - status: {status}")
+                
+                if not supplier_id or not branch_id or not order_date:
+                    print(f"❌ Missing required fields")
+                    flash('Supplier, Branch, and Order Date are required', 'error')
+                    return redirect(url_for('edit_purchase_order', id=id))
+                
+                po.supplier_id = supplier_id
+                po.branch_id = branch_id
+                po.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
+                po.expected_delivery_date = datetime.strptime(expected_delivery_date, '%Y-%m-%d').date() if expected_delivery_date else None
+                po.notes = notes
+                
+                if status and status != po.status:
+                    po.status = status
+                    if status == 'approved':
+                        po.approved_by = current_user.id
+                        po.approved_at = datetime.now(EAT)
+                
+                db.session.commit()
+                print(f"✅ Purchase Order updated successfully")
+                flash('Purchase Order updated successfully', 'success')
+                return redirect(url_for('purchase_orders'))
+            except Exception as e:
+                db.session.rollback()
+                print(f"❌ Error updating purchase order: {str(e)}")
+                print(f"❌ Error type: {type(e).__name__}")
+                import traceback
+                print(f"❌ Full traceback:")
+                traceback.print_exc()
+                flash(f'An error occurred while updating purchase order: {str(e)}', 'error')
+                return redirect(url_for('edit_purchase_order', id=id))
+        
+        # GET request - prepare data for template
+        try:
+            print(f"📋 Preparing data for template")
+            suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+            branches = Branch.query.all()
+            products = Product.query.all()
+            
+            print(f"✅ Data prepared:")
+            print(f"   - Suppliers count: {len(suppliers)}")
+            print(f"   - Branches count: {len(branches)}")
+            print(f"   - Products count: {len(products)}")
+            
+            # Check if template exists
+            import os
+            template_path = os.path.join(app.template_folder, 'edit_purchase_order.html')
+            if os.path.exists(template_path):
+                print(f"✅ Template file exists: {template_path}")
+            else:
+                print(f"❌ Template file not found: {template_path}")
+            
+            print(f"🎯 Attempting to render template...")
+            
+            # Debug: Print PO data structure
+            print(f"🔍 PO data structure:")
+            print(f"   - ID: {po.id}")
+            print(f"   - PO Number: {po.po_number}")
+            print(f"   - Status: {po.status}")
+            print(f"   - Items count: {len(po.items) if po.items else 0}")
+            
+            if po.items:
+                for i, item in enumerate(po.items):
+                    print(f"   - Item {i+1}:")
+                    print(f"     * ID: {item.id}")
+                    print(f"     * Product Name: {item.product_name}")
+                    print(f"     * Product Code: {item.product_code}")
+                    print(f"     * Quantity: {item.quantity}")
+                    print(f"     * Unit Price: {item.unit_price}")
+                    print(f"     * Total Price: {item.total_price}")
+                    print(f"     * Received Quantity: {item.received_quantity}")
+            
+            result = render_template('edit_purchase_order.html', 
+                                   po=po, 
+                                   suppliers=suppliers, 
+                                   branches=branches,
+                                   products=products)
+            print(f"✅ Template rendered successfully")
+            return result
+            
         except Exception as e:
-            db.session.rollback()
-            print(f"Error updating purchase order: {e}")
-            flash('An error occurred while updating purchase order.', 'error')
-            return redirect(url_for('edit_purchase_order', id=id))
-    
-    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
-    branches = Branch.query.all()
-    products = Product.query.all()
-    
-    return render_template('edit_purchase_order.html', 
-                         po=po, 
-                         suppliers=suppliers, 
-                         branches=branches,
-                         products=products)
+            print(f"❌ Error preparing template data: {str(e)}")
+            print(f"❌ Error type: {type(e).__name__}")
+            import traceback
+            print(f"❌ Full traceback:")
+            traceback.print_exc()
+            flash(f'An error occurred while loading the page: {str(e)}', 'error')
+            return redirect(url_for('purchase_orders'))
+            
+    except Exception as e:
+        print(f"❌ Critical error in edit_purchase_order route: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Full traceback:")
+        traceback.print_exc()
+        flash(f'A critical error occurred: {str(e)}', 'error')
+        return redirect(url_for('purchase_orders'))
+
+@app.route('/test_db_connection')
+def test_db_connection():
+    """Test route to check database connection and models"""
+    try:
+        print("🔍 Testing database connection...")
+        
+        # Test basic database connection
+        db.session.execute('SELECT 1')
+        print("✅ Database connection successful")
+        
+        # Test PurchaseOrder model
+        po_count = PurchaseOrder.query.count()
+        print(f"✅ PurchaseOrder model working. Total POs: {po_count}")
+        
+        # Test Supplier model
+        supplier_count = Supplier.query.count()
+        print(f"✅ Supplier model working. Total suppliers: {supplier_count}")
+        
+        # Test Branch model
+        branch_count = Branch.query.count()
+        print(f"✅ Branch model working. Total branches: {branch_count}")
+        
+        # Test Product model
+        product_count = Product.query.count()
+        print(f"✅ Product model working. Total products: {product_count}")
+        
+        # Check if PO with ID 1 exists
+        po_1 = PurchaseOrder.query.get(1)
+        if po_1:
+            print(f"✅ Purchase Order ID 1 exists: {po_1.po_number}")
+            print(f"   - Status: {po_1.status}")
+            print(f"   - Supplier ID: {po_1.supplier_id}")
+            print(f"   - Branch ID: {po_1.branch_id}")
+        else:
+            print("❌ Purchase Order ID 1 does not exist")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Database connection and models working',
+            'po_count': po_count,
+            'supplier_count': supplier_count,
+            'branch_count': branch_count,
+            'product_count': product_count,
+            'po_1_exists': po_1 is not None
+        })
+        
+    except Exception as e:
+        print(f"❌ Database test failed: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Full traceback:")
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'error_type': type(e).__name__
+        }), 500
 
 @app.route('/delete_purchase_order/<int:id>', methods=['POST'])
 @login_required
@@ -2346,26 +2496,28 @@ def add_po_item(po_id):
             flash('Cannot add items to purchase order that is not in draft or submitted status', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
         
-        product_id = request.form.get('product_id')
+        product_code = request.form.get('product_code')
+        product_name = request.form.get('product_name')
         quantity = request.form.get('quantity')
         unit_price = request.form.get('unit_price')
         notes = request.form.get('notes')
         
-        if not product_id or not quantity or not unit_price:
-            flash('Product, Quantity, and Unit Price are required', 'error')
+        if not product_code or not product_name or not quantity:
+            flash('Product Code, Product Name, and Quantity are required', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
         
         try:
             quantity = int(quantity)
-            unit_price = float(unit_price)
-            total_price = quantity * unit_price
-        except ValueError:
+            unit_price = Decimal(str(unit_price)) if unit_price else None
+            total_price = quantity * unit_price if unit_price else None
+        except (ValueError, TypeError):
             flash('Invalid quantity or unit price', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
         
         new_item = PurchaseOrderItem(
             purchase_order_id=po_id,
-            product_id=product_id,
+            product_code=product_code,
+            product_name=product_name,
             quantity=quantity,
             unit_price=unit_price,
             total_price=total_price,
@@ -2375,8 +2527,8 @@ def add_po_item(po_id):
         db.session.add(new_item)
         
         # Update PO totals
-        po.subtotal = sum(item.total_price for item in po.items)
-        po.total_amount = po.subtotal + po.tax_amount - po.discount_amount
+        po.subtotal = sum(item.total_price for item in po.items if item.total_price)
+        po.total_amount = po.subtotal + (po.tax_amount or Decimal('0')) - (po.discount_amount or Decimal('0'))
         
         db.session.commit()
         flash('Item added to purchase order successfully', 'success')
@@ -2386,6 +2538,107 @@ def add_po_item(po_id):
         print(f"Error adding PO item: {e}")
         flash('An error occurred while adding item to purchase order.', 'error')
         return redirect(url_for('edit_purchase_order', id=po_id))
+
+@app.route('/edit_po_item/<int:item_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_po_item(item_id):
+    try:
+        print(f"🔍 Attempting to edit PO item with ID: {item_id}")
+        
+        # Get the PO item
+        po_item = PurchaseOrderItem.query.get_or_404(item_id)
+        print(f"✅ Found PO Item: {po_item.product_name} (ID: {po_item.id})")
+        
+        # Get the parent purchase order
+        po = po_item.purchase_order
+        print(f"✅ Parent PO: {po.po_number} (ID: {po.id})")
+        
+        if request.method == 'POST':
+            try:
+                print(f"📝 Processing POST request for PO item {item_id}")
+                
+                # Get form data
+                product_code = request.form.get('product_code')
+                product_name = request.form.get('product_name')
+                quantity = request.form.get('quantity')
+                unit_price = request.form.get('unit_price')
+                notes = request.form.get('notes')
+                
+                print(f"📝 Form data received:")
+                print(f"   - product_code: {product_code}")
+                print(f"   - product_name: {product_name}")
+                print(f"   - quantity: {quantity}")
+                print(f"   - unit_price: {unit_price}")
+                print(f"   - notes: {notes}")
+                
+                # Validate required fields
+                if not product_code or not product_name or not quantity:
+                    print(f"❌ Missing required fields")
+                    flash('Product Code, Product Name, and Quantity are required', 'error')
+                    return redirect(url_for('edit_po_item', item_id=item_id))
+                
+                # Validate numeric fields
+                try:
+                    quantity = int(quantity)
+                    unit_price = Decimal(str(unit_price)) if unit_price else None
+                except (ValueError, TypeError):
+                    print(f"❌ Invalid quantity or unit price")
+                    flash('Invalid quantity or unit price', 'error')
+                    return redirect(url_for('edit_po_item', item_id=item_id))
+                
+                # Check if PO is editable
+                if po.status not in ['draft', 'submitted']:
+                    print(f"❌ PO status '{po.status}' does not allow editing")
+                    flash('Cannot edit items in purchase order that is not in draft or submitted status', 'error')
+                    return redirect(url_for('edit_purchase_order', id=po.id))
+                
+                # Update the item
+                po_item.product_code = product_code
+                po_item.product_name = product_name
+                po_item.quantity = quantity
+                po_item.unit_price = unit_price
+                po_item.notes = notes
+                
+                # Calculate total price if unit price is provided
+                if unit_price:
+                    po_item.total_price = quantity * unit_price
+                else:
+                    po_item.total_price = None
+                
+                po_item.updated_at = datetime.now(EAT)
+                
+                # Update PO totals
+                po.subtotal = sum(item.total_price for item in po.items if item.total_price)
+                po.total_amount = po.subtotal + (po.tax_amount or Decimal('0')) - (po.discount_amount or Decimal('0'))
+                
+                db.session.commit()
+                print(f"✅ PO Item updated successfully")
+                print(f"✅ PO totals updated - Subtotal: {po.subtotal}, Total: {po.total_amount}")
+                flash('Purchase Order Item updated successfully', 'success')
+                return redirect(url_for('edit_purchase_order', id=po.id))
+                
+            except Exception as e:
+                db.session.rollback()
+                print(f"❌ Error updating PO item: {str(e)}")
+                print(f"❌ Error type: {type(e).__name__}")
+                import traceback
+                print(f"❌ Full traceback:")
+                traceback.print_exc()
+                flash(f'An error occurred while updating the item: {str(e)}', 'error')
+                return redirect(url_for('edit_po_item', item_id=item_id))
+        
+        # GET request - show edit form
+        return render_template('edit_po_item.html', po_item=po_item, po=po)
+        
+    except Exception as e:
+        print(f"❌ Critical error in edit_po_item route: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Full traceback:")
+        traceback.print_exc()
+        flash(f'A critical error occurred: {str(e)}', 'error')
+        return redirect(url_for('purchase_orders'))
 
 @app.route('/delete_po_item/<int:item_id>', methods=['POST'])
 @login_required
@@ -2402,8 +2655,8 @@ def delete_po_item(item_id):
         db.session.delete(item)
         
         # Update PO totals
-        po.subtotal = sum(item.total_price for item in po.items)
-        po.total_amount = po.subtotal + po.tax_amount - po.discount_amount
+        po.subtotal = sum(item.total_price for item in po.items if item.total_price)
+        po.total_amount = po.subtotal + (po.tax_amount or Decimal('0')) - (po.discount_amount or Decimal('0'))
         
         db.session.commit()
         flash('Item removed from purchase order successfully', 'success')
@@ -2425,30 +2678,13 @@ def receive_po(po_id):
             flash('Purchase order must be in ordered status to receive', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
         
-        # Update received quantities and add stock
+        # Update received quantities
         for item in po.items:
             received_qty = request.form.get(f'received_qty_{item.id}', 0)
             try:
                 received_qty = int(received_qty)
                 if received_qty > 0:
                     item.received_quantity = received_qty
-                    
-                    # Add stock to product
-                    product = item.product
-                    old_stock = product.stock or 0
-                    product.stock = old_stock + received_qty
-                    
-                    # Create stock transaction
-                    stock_transaction = StockTransaction(
-                        productid=product.id,
-                        userid=current_user.id,
-                        transaction_type='add',
-                        quantity=received_qty,
-                        previous_stock=old_stock,
-                        new_stock=product.stock,
-                        notes=f'Received from PO {po.po_number}'
-                    )
-                    db.session.add(stock_transaction)
             except ValueError:
                 flash('Invalid received quantity', 'error')
                 return redirect(url_for('edit_purchase_order', id=po_id))
@@ -2458,23 +2694,247 @@ def receive_po(po_id):
         
         db.session.commit()
         flash('Purchase order received successfully', 'success')
-        return redirect(url_for('purchase_orders'))
+        return redirect(url_for('purchase_order_details', po_id=po_id))
     except Exception as e:
         db.session.rollback()
         print(f"Error receiving PO: {e}")
         flash('An error occurred while receiving purchase order.', 'error')
-        return redirect(url_for('edit_purchase_order', id=po_id))
+        return redirect(url_for('purchase_order_details', po_id=po_id))
 
 @app.route('/purchase_order_details/<int:po_id>')
 @login_required
 @role_required(['admin'])
 def purchase_order_details(po_id):
     try:
-        po = PurchaseOrder.query.get_or_404(po_id)
+                
+        po = PurchaseOrder.query.get(po_id)
+        if not po:
+            
+            flash(f'Purchase Order with ID {po_id} not found', 'error')
+            return redirect(url_for('purchase_orders'))
+        
+        
+        
+      
+        
+     
         return render_template('purchase_order_details.html', po=po)
+        
     except Exception as e:
-        print(f"Error in purchase_order_details route: {e}")
-        flash('An error occurred while loading purchase order details.', 'error')
+        
+        import traceback
+       
+        traceback.print_exc()
+        flash(f'A critical error occurred while loading purchase order details: {str(e)}', 'error')
+        return redirect(url_for('purchase_orders'))
+
+@app.route('/export_purchase_order_pdf/<int:po_id>')
+@login_required
+@role_required(['admin'])
+def export_purchase_order_pdf(po_id):
+    try:
+        # Get the purchase order
+        po = PurchaseOrder.query.get_or_404(po_id)
+        
+        # Create PDF buffer
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=18)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            alignment=1,  # Center alignment
+            textColor=colors.HexColor('#2c3e50')
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            spaceAfter=20,
+            textColor=colors.HexColor('#34495e')
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=12
+        )
+        
+        # Recreate the ABZ Hardware letterhead manually
+        
+        # Try to load the logo for the left side
+        try:
+            logo_path = os.path.join(app.static_folder, 'assets', 'img', 'logo.png')
+            if os.path.exists(logo_path):
+                logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
+                logo_cell = logo_image
+            else:
+                # Fallback to text if logo not found
+                logo_cell = Paragraph('''
+                <para align=left>
+                <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
+                <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
+                <b><font size=14 color="#1a365d">LIMITED</font></b>
+                </para>
+                ''', normal_style)
+        except Exception as e:
+            print(f"Error loading logo: {e}")
+            # Fallback to text if logo fails to load
+            logo_cell = Paragraph('''
+            <para align=left>
+            <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
+            <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
+            <b><font size=14 color="#1a365d">LIMITED</font></b>
+            </para>
+            ''', normal_style)
+        
+        # Create the letterhead table for proper layout
+        letterhead_data = [[
+            # Left side - Logo Image
+            logo_cell,
+            
+            # Right side - Contact Information
+            Paragraph('''
+            <para align=right>
+            <b><font size=11 color="#1a365d">Kombo Munyiri Road,</font></b><br/>
+            <b><font size=11 color="#1a365d">Gikomba, Nairobi, Kenya</font></b><br/>
+            <font size=10 color="#666666">0711 732 341 or 0725 000 055</font> 📞<br/>
+            <font size=10 color="#666666">info@abzhardware.co.ke</font> ✉<br/>
+            <font size=10 color="#666666">www.abzhardware.co.ke</font> 🌐
+            </para>
+            ''', normal_style)
+        ]]
+        
+        # Create letterhead table
+        letterhead_table = Table(letterhead_data, colWidths=[3.5*inch, 3.5*inch])
+        letterhead_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (0, 0), 0),
+            ('RIGHTPADDING', (1, 0), (1, 0), 0),
+        ]))
+        
+        elements.append(letterhead_table)
+        elements.append(Spacer(1, 10))
+        
+        # Add the colored line separator (yellow and dark blue)
+        separator_data = [[""]]
+        separator_table = Table(separator_data, colWidths=[7*inch], rowHeights=[0.15*inch])
+        separator_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#f4b942')),  # Yellow color
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#1a365d')),   # Dark blue border
+        ]))
+        
+        elements.append(separator_table)
+        elements.append(Spacer(1, 30))
+        
+        # Purchase Order Title
+        elements.append(Paragraph(f"PURCHASE ORDER", title_style))
+        elements.append(Spacer(1, 30))
+        
+        # PO Details Section
+        po_details = f"""
+        <b>PO Number:</b> {po.po_number}<br/>
+        <b>Date:</b> {po.order_date.strftime('%B %d, %Y') if po.order_date else 'N/A'}<br/>
+        <b>Supplier:</b> {po.supplier.name if po.supplier else 'N/A'}<br/>
+        <b>Branch:</b> {po.branch.name if po.branch else 'N/A'}<br/>
+        <b>Expected Delivery:</b> {po.expected_delivery_date.strftime('%B %d, %Y') if po.expected_delivery_date else 'Not specified'}
+        """
+        elements.append(Paragraph(po_details, normal_style))
+        elements.append(Spacer(1, 30))
+        
+        # Items Table (simplified: Product Code, Product Name, Quantity only)
+        if po.items:
+            elements.append(Paragraph("ITEMS ORDERED", heading_style))
+            
+            # Table data - simplified to 3 columns only
+            data = [['Product Code', 'Product Name', 'Quantity']]
+            
+            for item in po.items:
+                data.append([
+                    item.product_code or 'N/A',
+                    item.product_name or 'N/A',
+                    str(item.quantity) if item.quantity else '0'
+                ])
+            
+            # Create table with 3 columns - adjusted for wider page
+            table = Table(data, colWidths=[2.2*inch, 4.5*inch, 1.5*inch])
+            table.setStyle(TableStyle([
+                # Header row
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                
+                # Data rows
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+                
+                # Alternating row colors
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+                
+                # Alignment adjustments
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Product Code center
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),    # Product Name left
+                ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # Quantity center
+                
+                # Padding
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+            
+            elements.append(table)
+            elements.append(Spacer(1, 30))
+        else:
+            elements.append(Paragraph("No items in this purchase order.", normal_style))
+            elements.append(Spacer(1, 30))
+        
+        # Notes section
+        if po.notes:
+            elements.append(Paragraph("NOTES", heading_style))
+            elements.append(Paragraph(po.notes, normal_style))
+            elements.append(Spacer(1, 20))
+        
+        # Footer
+        footer_text = f"""
+        <para align=center>
+        <font size=8 color="#95a5a6">
+        Generated on {datetime.now(EAT).strftime('%B %d, %Y at %I:%M %p')} by {current_user.firstname} {current_user.lastname}<br/>
+        This is a computer-generated document and does not require a signature.
+        </font>
+        </para>
+        """
+        elements.append(Spacer(1, 50))
+        elements.append(Paragraph(footer_text, normal_style))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF data
+        pdf_data = buffer.getvalue()
+        buffer.close()
+        
+        # Create response
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="PO_{po.po_number}.pdf"'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error generating PDF: {e}")
+        flash('An error occurred while generating the PDF.', 'error')
         return redirect(url_for('purchase_orders'))
 
 # Error handlers
