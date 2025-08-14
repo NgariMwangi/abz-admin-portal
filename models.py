@@ -66,6 +66,20 @@ class User(db.Model):
 
     def get_id(self):
         return str(self.id)
+    
+    def check_password(self, password):
+        """Check if the provided password matches the stored hash"""
+        from werkzeug.security import check_password_hash
+        return check_password_hash(self.password, password)
+    
+    def set_password(self, password):
+        """Set a new password with proper hashing"""
+        from werkzeug.security import generate_password_hash
+        self.password = generate_password_hash(password)
+    
+    def is_password_hashed(self):
+        """Check if the password is properly hashed (not plain text)"""
+        return self.password.startswith('pbkdf2:sha256:') or self.password.startswith('scrypt:')
 
 class PasswordReset(db.Model):
     __tablename__ = 'password_resets'

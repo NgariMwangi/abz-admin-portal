@@ -179,7 +179,12 @@ def login_post():
         print(email)
         print(password)
         
-        user = User.query.filter_by(email=email, password=password).first()
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            # Password is correct
+            pass
+        else:
+            user = None
         print(user)
         # Check if user exists and password is correct
         if not user:
@@ -195,6 +200,63 @@ def login_post():
         return redirect(next_page or url_for('index'))
     
     return render_template("login.html")
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    # Temporarily allow registration without authentication
+    # if current_user.is_authenticated:
+    #     return redirect(url_for('index'))
+        
+    if request.method == "POST":
+        email = request.form.get("email")
+        firstname = request.form.get("firstname")
+        lastname = request.form.get("lastname")
+        password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+        phone = request.form.get("phone")
+        
+        # Validation
+        if not email or not firstname or not lastname or not password or not confirm_password:
+            flash('All required fields must be filled', 'danger')
+            return redirect(url_for('register'))
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'danger')
+            return redirect(url_for('register'))
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long', 'danger')
+            return redirect(url_for('register'))
+        
+        # Check if email already exists
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('Email already exists. Please use a different email.', 'danger')
+            return redirect(url_for('register'))
+        
+        # Create new admin user with hashed password
+        new_user = User(
+            email=email,
+            firstname=firstname,
+            lastname=lastname,
+            password='',  # Will be set securely below
+            role='admin',
+            phone=phone
+        )
+        new_user.set_password(password)  # Hash the password securely
+        
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Admin user registered successfully! You can now login.', 'success')
+            return redirect(url_for('login_post'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error registering user: {e}")
+            flash('An error occurred while registering. Please try again.', 'danger')
+            return redirect(url_for('register'))
+    
+    return render_template("register.html")
 
 @app.route('/logout')
 @login_required
@@ -768,9 +830,10 @@ def add_user():
             email=email,
             firstname=firstname,
             lastname=lastname,
-            password=password,  # In production, you should hash this password
+            password='',  # Will be set securely below
             role=role
         )
+        new_user.set_password(password)  # Hash the password securely
         
         try:
             db.session.add(new_user)
@@ -817,7 +880,7 @@ def edit_user(id):
         
         # Update password only if provided
         if password:
-            user.password = password  # In production, you should hash this password
+            user.set_password(password)  # Hash the password securely
         
         try:
             db.session.commit()
@@ -2952,5 +3015,73 @@ def handle_general_error(error):
     # Try to redirect back to the referring page, or to index if no referrer
     return redirect(request.referrer or url_for('index'))
 
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validation
+        if not current_password or not new_password or not confirm_password:
+            flash('All fields are required', 'error')
+            return redirect(url_for('change_password'))
+        
+        if new_password != confirm_password:
+            flash('New passwords do not match', 'error')
+            return redirect(url_for('change_password'))
+        
+        if len(new_password) < 6:
+            flash('New password must be at least 6 characters long', 'error')
+            return redirect(url_for('change_password'))
+        
+        # Verify current password
+        if not current_user.check_password(current_password):
+            flash('Current password is incorrect', 'error')
+            return redirect(url_for('change_password'))
+        
+        # Update password
+        try:
+            current_user.set_password(new_password)
+            db.session.commit()
+            flash('Password changed successfully', 'success')
+            return redirect(url_for('index'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while changing password', 'error')
+            return redirect(url_for('change_password'))
+    
+    return render_template('change_password.html')
+
+def migrate_existing_passwords():
+    """Migrate existing plain text passwords to hashed passwords"""
+    try:
+        users = User.query.all()
+        migrated_count = 0
+        
+        for user in users:
+            if not user.is_password_hashed():
+                # Generate a temporary password and hash it
+                temp_password = "ChangeMe123!"  # Default password for existing users
+                user.set_password(temp_password)
+                migrated_count += 1
+        
+        if migrated_count > 0:
+            db.session.commit()
+            print(f"✅ Migrated {migrated_count} users to hashed passwords")
+            print("⚠️  IMPORTANT: All migrated users now have password: ChangeMe123!")
+            print("⚠️  Please ask users to change their passwords on first login")
+        else:
+            print("✅ All passwords are already hashed")
+            
+    except Exception as e:
+        print(f"❌ Error during password migration: {e}")
+        db.session.rollback()
+
 if __name__ == '__main__':
+    # Uncomment the line below to migrate existing passwords
+    # with app.app_context():
+    #     migrate_existing_passwords()
+    
     app.run(debug=True)

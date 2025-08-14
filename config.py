@@ -6,8 +6,8 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = 'your-secret-key-here'
-    # SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:deno0707@localhost/abzone'
-    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:#Deno0707@69.197.187.23:5432/abzone'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:deno0707@localhost/abzone'
+    # SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:#Deno0707@69.197.187.23:5432/abzone'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Cloudinary Configuration
