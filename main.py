@@ -201,7 +201,7 @@ def login_post():
     
     return render_template("login.html")
 
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/gister', methods=['GET', 'POST'])
 def register():
     # Temporarily allow registration without authentication
     # if current_user.is_authenticated:
