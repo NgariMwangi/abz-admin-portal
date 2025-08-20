@@ -59,6 +59,8 @@
                   <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
                   <option value="sales" {% if user.role == 'sales' %}selected{% endif %}>Sales</option>
                   <option value="customer" {% if user.role == 'customer' %}selected{% endif %}>Customer</option>
+                  <option value="cashier" {% if user.role == 'cashier' %}selected{% endif %}>Cashier</option>
+                  <option value="store" {% if user.role == 'store' %}selected{% endif %}>Store Keeper</option>
                 </select>
                 <small class="form-text text-muted">
                   <strong>Admin:</strong> Full access to all features<br>
