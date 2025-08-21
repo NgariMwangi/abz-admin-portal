@@ -33,88 +33,63 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Category search element not found');
     }
     
-    // Product Search Functionality
+    // Product Search Functionality - Server-side search with auto-submit
     const productSearch = document.getElementById('productSearch');
     const categoryFilter = document.getElementById('categoryFilter');
     const displayFilter = document.getElementById('displayFilter');
     
-    if (productSearch) {
-        console.log('Product search element found');
-        productSearch.addEventListener('keyup', function() {
-            console.log('Product search triggered:', this.value);
-            filterProducts();
-        });
-    }
+    // Find the search form - look for forms with search inputs
+    const searchForm = productSearch ? productSearch.closest('form') : null;
     
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', function() {
-            console.log('Category filter changed:', this.value);
-            filterProducts();
-        });
-    }
+    let searchTimeout;
     
-    if (displayFilter) {
-        displayFilter.addEventListener('change', function() {
-            console.log('Display filter changed:', this.value);
-            filterProducts();
+    if (productSearch && searchForm) {
+        console.log('Product search element and form found');
+        
+        // Auto-submit search after user stops typing (500ms delay)
+        productSearch.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                console.log('Auto-submitting search for:', this.value);
+                searchForm.submit();
+            }, 500);
         });
-    }
-    
-    function filterProducts() {
-        const searchTerm = document.getElementById('productSearch').value.toLowerCase();
-        const categoryFilter = document.getElementById('categoryFilter').value.toLowerCase();
-        const displayFilter = document.getElementById('displayFilter').value;
         
-        const table = document.getElementById('productsTable');
-        const tbody = table.getElementsByTagName('tbody')[0];
-        const rows = tbody.getElementsByTagName('tr');
-        
-        console.log('Filtering products:', { searchTerm, categoryFilter, displayFilter, rowCount: rows.length });
-        
-        for (let i = 0; i < rows.length; i++) {
-            const nameCell = rows[i].getElementsByTagName('td')[2];
-            const categoryCell = rows[i].getElementsByTagName('td')[3];
-            const productCodeCell = rows[i].getElementsByTagName('td')[8];
-            const displayCell = rows[i].getElementsByTagName('td')[9];
-            
-            if (nameCell && categoryCell && productCodeCell && displayCell) {
-                const name = nameCell.textContent.toLowerCase();
-                const category = categoryCell.textContent.toLowerCase();
-                const productCode = productCodeCell.textContent.toLowerCase();
-                const displayText = displayCell.textContent.toLowerCase();
-                
-                // Check search term
-                const matchesSearch = name.includes(searchTerm) || 
-                                    category.includes(searchTerm) || 
-                                    productCode.includes(searchTerm);
-                
-                // Check category filter
-                const matchesCategory = categoryFilter === '' || category.includes(categoryFilter);
-                
-                // Check display filter
-                let matchesDisplay = true;
-                if (displayFilter === 'true') {
-                    matchesDisplay = displayText.includes('visible');
-                } else if (displayFilter === 'false') {
-                    matchesDisplay = displayText.includes('hidden');
-                }
-                
-                if (matchesSearch && matchesCategory && matchesDisplay) {
-                    rows[i].style.display = '';
-                } else {
-                    rows[i].style.display = 'none';
-                }
+        // Also submit on Enter key
+        productSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(searchTimeout);
+                searchForm.submit();
             }
-        }
+        });
+    }
+    
+    if (categoryFilter && searchForm) {
+        categoryFilter.addEventListener('change', function() {
+            console.log('Category filter changed, submitting form');
+            searchForm.submit();
+        });
+    }
+    
+    if (displayFilter && searchForm) {
+        displayFilter.addEventListener('change', function() {
+            console.log('Display filter changed, submitting form');
+            searchForm.submit();
+        });
     }
     
     // Make clearFilters function global
     window.clearFilters = function() {
         console.log('Clearing filters');
-        document.getElementById('productSearch').value = '';
-        document.getElementById('categoryFilter').value = '';
-        document.getElementById('displayFilter').value = '';
-        filterProducts();
+        if (productSearch) productSearch.value = '';
+        if (categoryFilter) categoryFilter.value = '';
+        if (displayFilter) displayFilter.value = '';
+        
+        // Submit the form to refresh results
+        if (searchForm) {
+            searchForm.submit();
+        }
     };
     
     console.log('Search functionality initialized successfully');
