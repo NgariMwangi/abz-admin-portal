@@ -321,7 +321,7 @@ def delete_from_cloudinary(public_id):
 # Context processor to make branches available to all templates
 @app.context_processor
 def inject_branches():
-    branches = Branch.query.all()
+    branches = Branch.query.order_by(Branch.name).all()
     return dict(branches=branches)
 
 # Categories Routes
@@ -329,9 +329,9 @@ def inject_branches():
 @login_required
 @role_required(['admin'])
 def products():
-    categories = Category.query.all()
-    subcategories = SubCategory.query.all()
-    branches = Branch.query.all()
+    categories = Category.query.order_by(Category.name).all()
+    subcategories = SubCategory.query.order_by(SubCategory.name).all()
+    branches = Branch.query.order_by(Branch.name).all()
     
     # Get selected branch from query parameter
     selected_branch_id = request.args.get('branch_id', type=int)
@@ -400,9 +400,9 @@ def products():
 def branch_products(branch_id):
     # Get the specific branch
     branch = Branch.query.get_or_404(branch_id)
-    categories = Category.query.all()
-    subcategories = SubCategory.query.all()
-    branches = Branch.query.all()
+    categories = Category.query.order_by(Category.name).all()
+    subcategories = SubCategory.query.order_by(SubCategory.name).all()
+    branches = Branch.query.order_by(Branch.name).all()
     
     # Search and filter parameters
     search = request.args.get('search', '')
@@ -1033,7 +1033,7 @@ def orders():
         print(f"Orders found: {len(orders)}")
         
         # Get filter options
-        branches = Branch.query.all()
+        branches = Branch.query.order_by(Branch.name).all()
         
         return render_template('orders.html', 
                              orders=orders, 
@@ -1533,7 +1533,7 @@ def category_details(category_id):
         category = Category.query.get_or_404(category_id)
         
         # Get subcategories for this category
-        subcategories = SubCategory.query.filter_by(category_id=category_id).all()
+        subcategories = SubCategory.query.filter_by(category_id=category_id).order_by(SubCategory.name).all()
         subcategory_ids = [sub.id for sub in subcategories]
         
         # Handle both old and new product structures
@@ -1654,7 +1654,7 @@ def add_subcategory():
             return redirect(url_for('add_subcategory'))
     
     # Get all categories for the dropdown
-    categories = Category.query.all()
+    categories = Category.query.order_by(Category.name).all()
     return render_template('add_subcategory.html', categories=categories)
 
 @app.route('/edit_subcategory/<int:id>', methods=['GET', 'POST'])
@@ -1711,7 +1711,7 @@ def edit_subcategory(id):
             return redirect(url_for('edit_subcategory', id=id))
     
     # Get all categories for the dropdown
-    categories = Category.query.all()
+    categories = Category.query.order_by(Category.name).all()
     return render_template('edit_subcategory.html', subcategory=subcategory, categories=categories)
 
 @app.route('/delete_subcategory/<int:id>', methods=['POST'])
