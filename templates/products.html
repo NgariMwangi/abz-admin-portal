@@ -159,24 +159,50 @@
             <!-- Products Search Bar -->
             <div class="search-container">
               <div class="filter-container">
-                <div class="input-group">
-                  <span class="input-group-text"><i class="fas fa-search"></i></span>
-                  <input type="text" class="form-control" id="productSearch" placeholder="Search products by name, code, or category...">
-                </div>
-                <select class="form-control" id="categoryFilter">
-                  <option value="">All Categories</option>
-                  {% for subcategory in subcategories %}
-                  <option value="{{ subcategory.name }}">{{ subcategory.name }} ({{ subcategory.category.name }})</option>
-                  {% endfor %}
-                </select>
-                <select class="form-control" id="displayFilter">
-                  <option value="">All Products</option>
-                  <option value="true">Visible Only</option>
-                  <option value="false">Hidden Only</option>
-                </select>
-                <button class="btn btn-secondary" onclick="clearFilters()">
-                  <i class="fas fa-times"></i> Clear
-                </button>
+                <form method="GET" action="{{ url_for('products') }}" class="row g-3">
+                  <div class="col-md-3">
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="fas fa-search"></i></span>
+                      <input type="text" class="form-control" id="productSearch" name="search" 
+                             value="{{ search }}" placeholder="Search products by name, code, or category...">
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <select class="form-control" id="categoryFilter" name="category">
+                      <option value="">All Categories</option>
+                      {% for subcategory in subcategories %}
+                      <option value="{{ subcategory.name }}" {% if category_filter == subcategory.name %}selected{% endif %}>
+                        {{ subcategory.name }} ({{ subcategory.category.name }})
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <select class="form-control" id="displayFilter" name="display">
+                      <option value="">All Products</option>
+                      <option value="true" {% if display_filter == 'true' %}selected{% endif %}>Visible Only</option>
+                      <option value="false" {% if display_filter == 'false' %}selected{% endif %}>Hidden Only</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <select class="form-control" name="per_page">
+                      <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10 per page</option>
+                      <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25 per page</option>
+                      <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50 per page</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                      <i class="fas fa-search"></i> Search
+                    </button>
+                    <a href="{{ url_for('products') }}" class="btn btn-secondary">
+                      <i class="fas fa-times"></i> Clear
+                    </a>
+                  </div>
+                  {% if selected_branch_id %}
+                  <input type="hidden" name="branch_id" value="{{ selected_branch_id }}">
+                  {% endif %}
+                </form>
               </div>
             </div>
             <div class="table-responsive">
@@ -646,89 +672,8 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Category search element not found');
     }
     
-    // Product Search Functionality
-    const productSearch = document.getElementById('productSearch');
-    const categoryFilter = document.getElementById('categoryFilter');
-    const displayFilter = document.getElementById('displayFilter');
-    
-    if (productSearch) {
-        console.log('Product search element found');
-        productSearch.addEventListener('keyup', function() {
-            console.log('Product search triggered:', this.value);
-            filterProducts();
-        });
-    }
-    
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', function() {
-            console.log('Category filter changed:', this.value);
-            filterProducts();
-        });
-    }
-    
-    if (displayFilter) {
-        displayFilter.addEventListener('change', function() {
-            console.log('Display filter changed:', this.value);
-            filterProducts();
-        });
-    }
-    
-    function filterProducts() {
-        const searchTerm = document.getElementById('productSearch').value.toLowerCase();
-        const categoryFilter = document.getElementById('categoryFilter').value.toLowerCase();
-        const displayFilter = document.getElementById('displayFilter').value;
-        
-        const table = document.getElementById('productsTable');
-        const tbody = table.getElementsByTagName('tbody')[0];
-        const rows = tbody.getElementsByTagName('tr');
-        
-        console.log('Filtering products:', { searchTerm, categoryFilter, displayFilter, rowCount: rows.length });
-        
-        for (let i = 0; i < rows.length; i++) {
-            const nameCell = rows[i].getElementsByTagName('td')[2];
-            const categoryCell = rows[i].getElementsByTagName('td')[3];
-            const productCodeCell = rows[i].getElementsByTagName('td')[8];
-            const displayCell = rows[i].getElementsByTagName('td')[9];
-            
-            if (nameCell && categoryCell && productCodeCell && displayCell) {
-                const name = nameCell.textContent.toLowerCase();
-                const category = categoryCell.textContent.toLowerCase();
-                const productCode = productCodeCell.textContent.toLowerCase();
-                const displayText = displayCell.textContent.toLowerCase();
-                
-                // Check search term
-                const matchesSearch = name.includes(searchTerm) || 
-                                    category.includes(searchTerm) || 
-                                    productCode.includes(searchTerm);
-                
-                // Check category filter
-                const matchesCategory = categoryFilter === '' || category.includes(categoryFilter);
-                
-                // Check display filter
-                let matchesDisplay = true;
-                if (displayFilter === 'true') {
-                    matchesDisplay = displayText.includes('visible');
-                } else if (displayFilter === 'false') {
-                    matchesDisplay = displayText.includes('hidden');
-                }
-                
-                if (matchesSearch && matchesCategory && matchesDisplay) {
-                    rows[i].style.display = '';
-                } else {
-                    rows[i].style.display = 'none';
-                }
-            }
-        }
-    }
-    
-    // Make clearFilters function global
-    window.clearFilters = function() {
-        console.log('Clearing filters');
-        document.getElementById('productSearch').value = '';
-        document.getElementById('categoryFilter').value = '';
-        document.getElementById('displayFilter').value = '';
-        filterProducts();
-    };
+    // Server-side search is now handled by the form submission
+    // No need for client-side filtering anymore
     
     // Function to change items per page
     window.changeItemsPerPage = function(perPage) {

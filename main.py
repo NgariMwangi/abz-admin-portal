@@ -201,7 +201,7 @@ def login_post():
     
     return render_template("login.html")
 
-@app.route('/gister', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
     # Temporarily allow registration without authentication
     # if current_user.is_authenticated:
@@ -234,13 +234,16 @@ def register():
             flash('Email already exists. Please use a different email.', 'danger')
             return redirect(url_for('register'))
         
-        # Create new admin user with hashed password
+        # Get role from form
+        role = request.form.get("role", "admin")
+        
+        # Create new user with hashed password
         new_user = User(
             email=email,
             firstname=firstname,
             lastname=lastname,
             password='',  # Will be set securely below
-            role='admin',
+            role=role,
             phone=phone
         )
         new_user.set_password(password)  # Hash the password securely
@@ -333,20 +336,46 @@ def products():
     # Get selected branch from query parameter
     selected_branch_id = request.args.get('branch_id', type=int)
     
+    # Search and filter parameters
+    search = request.args.get('search', '')
+    category_filter = request.args.get('category', '')
+    display_filter = request.args.get('display', '')
+    
     # Pagination parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)  # Default 10 items per page
     
-    # Base query - don't join with Category since Product doesn't have direct relationship
+    # Base query - join with SubCategory and Category for better search
+    base_query = Product.query.join(
+        SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+    ).join(
+        Category, SubCategory.category_id == Category.id, isouter=True
+    )
+    
+    # Apply filters
     if selected_branch_id:
-        # Filter products by selected branch
-        base_query = Product.query.filter(Product.branchid == selected_branch_id)
-    else:
-        # Show all products if no branch is selected
-        base_query = Product.query
+        base_query = base_query.filter(Product.branchid == selected_branch_id)
+    
+    if search:
+        base_query = base_query.filter(
+            or_(
+                Product.name.ilike(f'%{search}%'),
+                Product.productcode.ilike(f'%{search}%'),
+                SubCategory.name.ilike(f'%{search}%'),
+                Category.name.ilike(f'%{search}%')
+            )
+        )
+    
+    if category_filter:
+        base_query = base_query.filter(SubCategory.name == category_filter)
+    
+    if display_filter == 'true':
+        base_query = base_query.filter(Product.display == True)
+    elif display_filter == 'false':
+        base_query = base_query.filter(Product.display == False)
     
     # Apply pagination
-    pagination = base_query.paginate(
+    pagination = base_query.order_by(Product.name).paginate(
         page=page, 
         per_page=per_page, 
         error_out=False
@@ -360,7 +389,10 @@ def products():
                          products=products, 
                          branches=branches,
                          selected_branch_id=selected_branch_id,
-                         pagination=pagination)
+                         pagination=pagination,
+                         search=search,
+                         category_filter=category_filter,
+                         display_filter=display_filter)
 
 @app.route('/branch_products/<int:branch_id>')
 @login_required
@@ -372,15 +404,43 @@ def branch_products(branch_id):
     subcategories = SubCategory.query.all()
     branches = Branch.query.all()
     
+    # Search and filter parameters
+    search = request.args.get('search', '')
+    category_filter = request.args.get('category', '')
+    display_filter = request.args.get('display', '')
+    
     # Pagination parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
-    # Filter products by the specific branch
-    base_query = Product.query.filter(Product.branchid == branch_id)
+    # Filter products by the specific branch and join with categories for search
+    base_query = Product.query.filter(Product.branchid == branch_id).join(
+        SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+    ).join(
+        Category, SubCategory.category_id == Category.id, isouter=True
+    )
+    
+    # Apply search filters
+    if search:
+        base_query = base_query.filter(
+            or_(
+                Product.name.ilike(f'%{search}%'),
+                Product.productcode.ilike(f'%{search}%'),
+                SubCategory.name.ilike(f'%{search}%'),
+                Category.name.ilike(f'%{search}%')
+            )
+        )
+    
+    if category_filter:
+        base_query = base_query.filter(SubCategory.name == category_filter)
+    
+    if display_filter == 'true':
+        base_query = base_query.filter(Product.display == True)
+    elif display_filter == 'false':
+        base_query = base_query.filter(Product.display == False)
     
     # Apply pagination
-    pagination = base_query.paginate(
+    pagination = base_query.order_by(Product.name).paginate(
         page=page, 
         per_page=per_page, 
         error_out=False
@@ -394,7 +454,10 @@ def branch_products(branch_id):
                          subcategories=subcategories,
                          products=products, 
                          branches=branches,
-                         pagination=pagination)
+                         pagination=pagination,
+                         search=search,
+                         category_filter=category_filter,
+                         display_filter=display_filter)
 
 @app.route('/add_category', methods=['GET', 'POST'])
 @login_required

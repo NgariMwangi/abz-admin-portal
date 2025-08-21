@@ -153,18 +153,29 @@
                     <input type="tel" class="form-control" id="phone" name="phone">
                 </div>
                 
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                        <div class="form-text">Min 6 characters</div>
-                    </div>
-                    
-                    <div class="col-md-6 mb-3">
-                        <label for="confirm_password" class="form-label">Confirm Password</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-                    </div>
-                </div>
+                                 <div class="row">
+                     <div class="col-md-6 mb-3">
+                         <label for="password" class="form-label">Password</label>
+                         <input type="password" class="form-control" id="password" name="password" required>
+                         <div class="form-text">Min 6 characters</div>
+                     </div>
+                     
+                     <div class="col-md-6 mb-3">
+                         <label for="confirm_password" class="form-label">Confirm Password</label>
+                         <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                     </div>
+                 </div>
+                 
+                 <div class="mb-3">
+                     <label for="role" class="form-label">User Role</label>
+                     <select class="form-control" id="role" name="role" required>
+                         <option value="">Select Role</option>
+                         <option value="admin">Admin</option>
+                         <option value="cashier">Cashier</option>
+                         <option value="store">Store Manager</option>
+                     </select>
+                     <div class="form-text">Choose the appropriate role for this user</div>
+                 </div>
                 
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-register">
