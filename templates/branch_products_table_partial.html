@@ -1,0 +1,116 @@
+<!-- Branch Products Table Partial - Used for AJAX updates -->
+<div class="table-responsive">
+  <table class="table table-hover" id="productsTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Image</th>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Buying Price</th>
+        <th>Selling Price</th>
+        <th>Stock</th>
+        <th>Product Code</th>
+        <th>Display</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for product in products %}
+      <tr>
+        <td>{{ product.id }}</td>
+        <td>
+          {% if product.image_url %}
+          <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
+          {% else %}
+          <span class="text-muted">No image</span>
+          {% endif %}
+        </td>
+        <td>{{ product.name }}</td>
+        <td>
+          {% if product.sub_category %}
+            {{ product.sub_category.name }} ({{ product.sub_category.category.name }})
+          {% else %}
+            <span class="text-muted">No category</span>
+          {% endif %}
+        </td>
+        <td>{{ product.buyingprice or 'N/A' }}</td>
+        <td>{{ product.sellingprice or 'N/A' }}</td>
+        <td>
+          <span class="badge {% if product.stock > 10 %}badge-success{% elif product.stock > 0 %}badge-warning{% else %}badge-danger{% endif %}">
+            {{ product.stock or 0 }}
+          </span>
+        </td>
+        <td>{{ product.productcode or 'N/A' }}</td>
+        <td>
+          <span class="badge {% if product.display %}badge-success{% else %}badge-secondary{% endif %}">
+            {{ 'Visible' if product.display else 'Hidden' }}
+          </span>
+        </td>
+        <td>
+          <div class="action-buttons">
+            <button class="btn btn-sm btn-info" onclick="viewProduct({{ product.id }})" title="View Details">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="editProduct({{ product.id }})" title="Edit">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="deleteProduct({{ product.id }})" title="Delete">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<nav aria-label="Branch products pagination">
+  <ul class="pagination justify-content-center">
+    {% if pagination.has_prev %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('branch_products', branch_id=branch.id, page=pagination.prev_num, search=search, category=category_filter, display=display_filter, per_page=pagination.per_page) }}">
+        <i class="fas fa-chevron-left"></i> Previous
+      </a>
+    </li>
+    {% endif %}
+    
+    {% for page_num in pagination.iter_pages() %}
+      {% if page_num %}
+        {% if page_num != pagination.page %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('branch_products', branch_id=branch.id, page=page_num, search=search, category=category_filter, display=display_filter, per_page=pagination.per_page) }}">{{ page_num }}</a>
+        </li>
+        {% else %}
+        <li class="page-item active">
+          <span class="page-link">{{ page_num }}</span>
+        </li>
+        {% endif %}
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">...</span>
+        </li>
+      {% endif %}
+    {% endfor %}
+    
+    {% if pagination.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('branch_products', branch_id=branch.id, page=pagination.next_num, search=search, category=category_filter, display=display_filter, per_page=pagination.per_page) }}">
+        Next <i class="fas fa-chevron-right"></i>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+<!-- Result Count -->
+<div class="text-center text-muted mt-3">
+  Showing {{ pagination.items|length }} of {{ pagination.total }} products in {{ branch.name }}
+  {% if search or category_filter or display_filter %}
+    (filtered results)
+  {% endif %}
+</div>

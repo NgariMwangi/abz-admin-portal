@@ -1,0 +1,135 @@
+<!-- Products Table Partial - Used for AJAX updates -->
+<div class="table-responsive">
+  <table class="table table-hover" id="productsTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Image</th>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Branch</th>
+        <th>Buying Price</th>
+        <th>Selling Price</th>
+        <th>Stock</th>
+        <th>Product Code</th>
+        <th>Display</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for product in products %}
+      <tr>
+        <td>{{ product.id }}</td>
+        <td>
+          {% if product.image_url %}
+          <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
+          {% else %}
+          <span class="text-muted">No image</span>
+          {% endif %}
+        </td>
+        <td>{{ product.name }}</td>
+        <td>
+          {% if product.sub_category %}
+            <span class="badge bg-primary">{{ product.sub_category.name }}</span>
+            <br><small class="text-muted">{{ product.sub_category.category.name }}</small>
+          {% else %}
+            <span class="text-muted">No category</span>
+          {% endif %}
+        </td>
+        <td>
+          {% for branch in branches %}
+            {% if branch.id == product.branchid %}
+              <span class="badge bg-info">{{ branch.name }}</span>
+            {% endif %}
+          {% endfor %}
+        </td>
+        <td>{{ product.buyingprice }}</td>
+        <td>{{ product.sellingprice }}</td>
+        <td>{{ product.stock }}</td>
+        <td>{{ product.productcode }}</td>
+        <td>
+          <form action="{{ url_for('toggle_display', product_id=product.id) }}" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-sm {% if product.display %}btn-success{% else %}btn-secondary{% endif %}" title="{% if product.display %}Visible in customer app{% else %}Hidden from customer app{% endif %}">
+              <i class="fas {% if product.display %}fa-eye{% else %}fa-eye-slash{% endif %}"></i>
+            </button>
+          </form>
+          <small class="d-block text-muted">
+            {% if product.display %}Visible{% else %}Hidden{% endif %}
+          </small>
+        </td>
+        <td>
+          <div class="action-buttons">
+            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addStockModal{{ product.id }}" title="Add Stock">
+              <i class="fas fa-plus"></i>
+            </button>
+            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#removeStockModal{{ product.id }}" title="Remove Stock">
+              <i class="fas fa-minus"></i>
+            </button>
+            <button class="btn btn-info btn-sm" onclick="window.location.href='{{ url_for('stock_history', product_id=product.id) }}'" title="Stock History">
+              <i class="fas fa-history"></i>
+            </button>
+            <a href="{{ url_for('product_descriptions', product_id=product.id) }}" class="btn btn-secondary btn-sm" title="Manage Descriptions">
+              <i class="fas fa-file-alt"></i>
+            </a>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProductModal{{ product.id }}" title="Edit Product">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteProductModal{{ product.id }}" title="Delete Product">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<nav aria-label="Products pagination">
+  <ul class="pagination justify-content-center">
+    {% if pagination.has_prev %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('products', page=pagination.prev_num, search=search, category=category_filter, display=display_filter, branch_id=selected_branch_id, per_page=pagination.per_page) }}">
+        <i class="fas fa-chevron-left"></i> Previous
+      </a>
+    </li>
+    {% endif %}
+    
+    {% for page_num in pagination.iter_pages() %}
+      {% if page_num %}
+        {% if page_num != pagination.page %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('products', page=page_num, search=search, category=category_filter, display=display_filter, branch_id=selected_branch_id, per_page=pagination.per_page) }}">{{ page_num }}</a>
+        </li>
+        {% else %}
+        <li class="page-item active">
+          <span class="page-link">{{ page_num }}</span>
+        </li>
+        {% endif %}
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">...</span>
+        </li>
+      {% endif %}
+    {% endfor %}
+    
+    {% if pagination.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('products', page=pagination.next_num, search=search, category=category_filter, display=display_filter, branch_id=selected_branch_id, per_page=pagination.per_page) }}">
+        Next <i class="fas fa-chevron-right"></i>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+<!-- Result Count -->
+<div class="text-center text-muted mt-3">
+  Showing {{ pagination.items|length }} of {{ pagination.total }} products
+  {% if search or category_filter or display_filter %}
+    (filtered results)
+  {% endif %}
+</div>

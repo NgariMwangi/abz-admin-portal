@@ -83,9 +83,9 @@
       </div>
       <div class="ms-md-auto py-2 py-md-0">
         <div class="btn-group" role="group">
-          <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+          <!-- <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="fas fa-building"></i> View by Branch
-          </button>
+          </button> -->
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{{ url_for('products') }}">All Products</a></li>
             <li><hr class="dropdown-divider"></li>
@@ -233,7 +233,8 @@
                       <span class="text-muted">No image</span>
                       {% endif %}
                     </td>
-                    <td>{{ product.name }}</td>
+                    <td>{{ product.name | upper }}</td>
+
                     <td>
                       {% if product.sub_category %}
                         <span class="badge bg-primary">{{ product.sub_category.name }}</span>

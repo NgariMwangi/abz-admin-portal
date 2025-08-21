@@ -116,7 +116,8 @@
 </style>
 
 <!-- Include search functionality -->
-<script src="{{ url_for('static', filename='js/search.js') }}"></script>
+<!-- Temporarily disabled for testing -->
+<!-- <script src="{{ url_for('static', filename='js/search.js') }}"></script> -->
 
 <div class="container">
   <div class="page-inner">
@@ -307,7 +308,9 @@
               <ul class="pagination justify-content-center">
                 {% if pagination.has_prev %}
                 <li class="page-item">
-                  <a class="page-link" href="{{ url_for('branch_products', branch_id=branch.id, page=pagination.prev_num, search=search, category=category_filter, display=display_filter, per_page=request.args.get('per_page', 10)) }}">Previous</a>
+                  <a class="page-link" href="{{ url_for('branch_products', branch_id=branch.id, page=pagination.prev_num, search=search, category=category_filter, display=display_filter, per_page=request.args.get('per_page', 10)) }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                  </a>
                 </li>
                 {% endif %}
                 
@@ -331,12 +334,22 @@
                 
                 {% if pagination.has_next %}
                 <li class="page-item">
-                  <a class="page-link" href="{{ url_for('branch_products', branch_id=branch.id, page=pagination.next_num, search=search, category=category_filter, display=display_filter, per_page=request.args.get('per_page', 10)) }}">Next</a>
+                  <a class="page-link" href="{{ url_for('branch_products', branch_id=branch.id, page=pagination.next_num, search=search, category=category_filter, display=display_filter, per_page=request.args.get('per_page', 10)) }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                  </a>
                 </li>
                 {% endif %}
               </ul>
             </nav>
             {% endif %}
+            
+            <!-- Result Count -->
+            <div class="text-center text-muted mt-3">
+              Showing {{ pagination.items|length }} of {{ pagination.total }} products in {{ branch.name }}
+              {% if search or category_filter or display_filter %}
+                (filtered results)
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
@@ -596,49 +609,8 @@
 </div>
 
 <script>
-// Search and filter functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('productSearch');
-    const categoryFilter = document.getElementById('categoryFilter');
-    const displayFilter = document.getElementById('displayFilter');
-    const table = document.getElementById('productsTable');
-    const tbody = table.querySelector('tbody');
-    const rows = tbody.querySelectorAll('tr');
-
-    function filterProducts() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedCategory = categoryFilter.value.toLowerCase();
-        const selectedDisplay = displayFilter.value;
-
-        rows.forEach(row => {
-            const name = row.cells[2].textContent.toLowerCase();
-            const category = row.cells[3].textContent.toLowerCase();
-            const display = row.cells[8].textContent.toLowerCase();
-
-            const matchesSearch = name.includes(searchTerm);
-            const matchesCategory = !selectedCategory || category.includes(selectedCategory);
-            const matchesDisplay = !selectedDisplay || 
-                (selectedDisplay === 'true' && display.includes('visible')) ||
-                (selectedDisplay === 'false' && display.includes('hidden'));
-
-            row.style.display = (matchesSearch && matchesCategory && matchesDisplay) ? '' : 'none';
-        });
-    }
-
-    searchInput.addEventListener('input', filterProducts);
-    categoryFilter.addEventListener('change', filterProducts);
-    displayFilter.addEventListener('change', filterProducts);
-});
-
-function clearFilters() {
-    document.getElementById('productSearch').value = '';
-    document.getElementById('categoryFilter').value = '';
-    document.getElementById('displayFilter').value = '';
-    
-    // Trigger filter to show all products
-    const event = new Event('input');
-    document.getElementById('productSearch').dispatchEvent(event);
-}
+// Search and filter functionality is now handled by search.js
+// This script only contains product action functions
 
 // Product action functions
 function addStock(productId) {

@@ -383,16 +383,29 @@ def products():
     
     products = pagination.items
     
-    return render_template('products.html', 
-                         categories=categories, 
-                         subcategories=subcategories,
-                         products=products, 
-                         branches=branches,
-                         selected_branch_id=selected_branch_id,
-                         pagination=pagination,
-                         search=search,
-                         category_filter=category_filter,
-                         display_filter=display_filter)
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Return only the table content for AJAX requests
+        return render_template('products_table_partial.html', 
+                             products=products, 
+                             branches=branches,
+                             selected_branch_id=selected_branch_id,
+                             pagination=pagination,
+                             search=search,
+                             category_filter=category_filter,
+                             display_filter=display_filter)
+    else:
+        # Return full page for regular requests
+        return render_template('products.html', 
+                             categories=categories, 
+                             subcategories=subcategories,
+                             products=products, 
+                             branches=branches,
+                             selected_branch_id=selected_branch_id,
+                             pagination=pagination,
+                             search=search,
+                             category_filter=category_filter,
+                             display_filter=display_filter)
 
 @app.route('/branch_products/<int:branch_id>')
 @login_required
@@ -448,16 +461,29 @@ def branch_products(branch_id):
     
     products = pagination.items
     
-    return render_template('branch_products.html', 
-                         branch=branch,
-                         categories=categories, 
-                         subcategories=subcategories,
-                         products=products, 
-                         branches=branches,
-                         pagination=pagination,
-                         search=search,
-                         category_filter=category_filter,
-                         display_filter=display_filter)
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Return only the table content for AJAX requests
+        return render_template('branch_products_table_partial.html', 
+                             branch=branch,
+                             products=products, 
+                             branches=branches,
+                             pagination=pagination,
+                             search=search,
+                             category_filter=category_filter,
+                             display_filter=display_filter)
+    else:
+        # Return full page for regular requests
+        return render_template('branch_products.html', 
+                             branch=branch,
+                             categories=categories, 
+                             subcategories=subcategories,
+                             products=products, 
+                             branches=branches,
+                             pagination=pagination,
+                             search=search,
+                             category_filter=category_filter,
+                             display_filter=display_filter)
 
 @app.route('/add_category', methods=['GET', 'POST'])
 @login_required

@@ -175,13 +175,7 @@
                       <span class="sub-item">All Products</span>
                     </a>
                   </li>
-                  {% for branch in branches %}
-                  <li class="nav-item">
-                    <a href="{{ url_for('branch_products', branch_id=branch.id) }}">
-                      <span class="sub-item">{{ branch.name }}</span>
-                    </a>
-                  </li>
-                  {% endfor %}
+               
                 </ul>
               </div>
             </li>
