@@ -92,6 +92,46 @@ def index():
     total_orders = Order.query.count()
     total_branches = Branch.query.count()
     
+    # Total product asset value (buying price * stock quantity)
+    # Exclude products with no buying price, zero stock, or null stock
+    total_product_asset = db.session.query(
+        func.sum(Product.buyingprice * Product.stock)
+    ).filter(
+        and_(
+            Product.buyingprice.isnot(None),  # Exclude products with no buying price
+            Product.buyingprice > 0,          # Exclude products with zero buying price
+            Product.stock.isnot(None),        # Exclude products with null stock
+            Product.stock > 0                 # Exclude products with zero stock
+        )
+    ).scalar() or 0
+    
+    # Product asset statistics
+    products_with_assets = db.session.query(Product).filter(
+        and_(
+            Product.buyingprice.isnot(None),
+            Product.buyingprice > 0,
+            Product.stock.isnot(None),
+            Product.stock > 0
+        )
+    ).count()
+    
+    products_without_buying_price = db.session.query(Product).filter(
+        or_(
+            Product.buyingprice.is_(None),
+            Product.buyingprice == 0
+        )
+    ).count()
+    
+    products_with_zero_stock = db.session.query(Product).filter(
+        or_(
+            Product.stock.is_(None),
+            Product.stock == 0
+        )
+    ).count()
+    
+    # Average asset value per product (excluding products without assets)
+    avg_asset_per_product = total_product_asset / products_with_assets if products_with_assets > 0 else 0
+    
     # Recent orders (last 7 days)
     recent_orders = Order.query.filter(
         Order.created_at >= today - timedelta(days=7)
@@ -139,6 +179,28 @@ def index():
         func.sum(OrderItem.quantity).desc()
     ).limit(5).all()
     
+    # Top products by asset value (buying price * stock)
+    top_products_by_asset_value = db.session.query(
+        Product, (Product.buyingprice * Product.stock).label('asset_value')
+    ).filter(
+        and_(
+            Product.buyingprice.isnot(None),
+            Product.buyingprice > 0,
+            Product.stock.isnot(None),
+            Product.stock > 0
+        )
+    ).order_by((Product.buyingprice * Product.stock).desc()).limit(5).all()
+    
+    # Calculate percentage of total assets for each top product
+    top_products_with_percentage = []
+    for product, asset_value in top_products_by_asset_value:
+        percentage = (asset_value / total_product_asset * 100) if total_product_asset > 0 else 0
+        top_products_with_percentage.append({
+            'product': product,
+            'asset_value': asset_value,
+            'percentage': percentage
+        })
+    
     # Expense statistics
     total_expenses = Expense.query.count()
     pending_expenses = Expense.query.filter_by(status='pending').count()
@@ -162,11 +224,18 @@ def index():
                          recent_users=recent_users,
                          branch_stats=branch_stats,
                          top_products=top_products,
+                         top_products_by_asset_value=top_products_by_asset_value,
+                         top_products_with_percentage=top_products_with_percentage,
                          total_expenses=total_expenses,
                          pending_expenses=pending_expenses,
                          approved_expenses=approved_expenses,
                          total_expense_amount=total_expense_amount,
-                         monthly_expenses=monthly_expenses)
+                         monthly_expenses=monthly_expenses,
+                         total_product_asset=total_product_asset,
+                         products_with_assets=products_with_assets,
+                         products_without_buying_price=products_without_buying_price,
+                         products_with_zero_stock=products_with_zero_stock,
+                         avg_asset_per_product=avg_asset_per_product)
 
 @app.route("/login", methods=["GET", "POST"])
 def login_post():
@@ -323,6 +392,17 @@ def delete_from_cloudinary(public_id):
 def inject_branches():
     branches = Branch.query.order_by(Branch.name).all()
     return dict(branches=branches)
+
+# Context processor to make user data available to all templates
+@app.context_processor
+def inject_user_data():
+    if current_user.is_authenticated:
+        return dict(
+            current_user=current_user,
+            user_full_name=f"{current_user.firstname} {current_user.lastname}",
+            user_role=current_user.role.title()
+        )
+    return dict(current_user=None, user_full_name="", user_role="")
 
 # Categories Routes
 @app.route('/products')
@@ -1226,6 +1306,28 @@ def profit_loss():
             db.func.sum(OrderItem.quantity).desc()
         ).limit(10).all()
         
+        # Top products by asset value (buying price * stock)
+        top_products_by_asset_value = db.session.query(
+            Product, (Product.buyingprice * Product.stock).label('asset_value')
+        ).filter(
+            and_(
+                Product.buyingprice.isnot(None),
+                Product.buyingprice > 0,
+                Product.stock.isnot(None),
+                Product.stock > 0
+            )
+        ).order_by((Product.buyingprice * Product.stock).desc()).limit(5).all()
+        
+        # Calculate percentage of total assets for each top product
+        top_products_with_percentage = []
+        for product, asset_value in top_products_by_asset_value:
+            percentage = (asset_value / total_product_asset * 100) if total_product_asset > 0 else 0
+            top_products_with_percentage.append({
+                'product': product,
+                'asset_value': asset_value,
+                'percentage': percentage
+            })
+        
         # Calculate profit margins
         gross_profit_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0
         net_profit_margin = (net_profit / total_revenue * 100) if total_revenue > 0 else 0
@@ -1243,6 +1345,8 @@ def profit_loss():
                              total_orders=total_orders,
                              paid_orders=paid_orders,
                              top_products=top_products,
+                             top_products_by_asset_value=top_products_by_asset_value,
+                             top_products_with_percentage=top_products_with_percentage,
                              expenses_by_category=expenses_by_category)
     except Exception as e:
         print(f"Error in profit_loss route: {e}")

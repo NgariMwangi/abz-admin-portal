@@ -309,7 +309,7 @@
                   </div>
                   <span class="profile-username">
                     <span class="op-7">Hi,</span>
-                    <span class="fw-bold">Admin</span>
+                    <span class="fw-bold">{{ user_full_name if user_full_name else 'Admin' }}</span>
                   </span>
                 </a>
                 <ul class="dropdown-menu dropdown-user animated fadeIn">
@@ -324,8 +324,9 @@
                           />
                         </div>
                         <div class="u-text">
-                          <h4>Admin</h4>
-                          <p class="text-muted">admin@abzhardware.co.ke</p>
+                          <h4>{{ user_full_name if user_full_name else 'Admin' }}</h4>
+                          <p class="text-muted">{{ current_user.email if current_user and current_user.email else 'admin@abzhardware.co.ke' }}</p>
+                          <p class="text-muted small">Role: {{ user_role if user_role else 'Admin' }}</p>
                           <!-- <a
                             href="profile.html"
                             class="btn btn-xs btn-secondary btn-sm"
@@ -342,7 +343,7 @@
                       <div class="dropdown-divider"></div>
                       <a class="dropdown-item" href="#">Account Setting</a>
                       <div class="dropdown-divider"></div> -->
-                      <a class="dropdown-item" href="/logout">Logout</a>
+                      <a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a>
                     </li>
                   </div>
                 </ul>
