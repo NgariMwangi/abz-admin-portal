@@ -75,6 +75,8 @@
           </div>
           <div class="card-body">
             {% if orders %}
+
+            
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead>
@@ -83,7 +85,7 @@
                     <th>Customer</th>
                     <th>Order Type</th>
                     <th>Branch</th>
-                    <th>Items</th>
+                   
                     <th>Total</th>
                     <th>Status</th>
                     <th>Payment</th>
@@ -114,19 +116,9 @@
                     <td>
                       <span class="badge badge-secondary">{{ order.branch.name }}</span>
                     </td>
+                  
                     <td>
-                      <span class="badge badge-light">{{ order.order_items|length }} items</span>
-                    </td>
-                    <td>
-                      {% set total = 0 %}
-                      {% for item in order.order_items %}
-                        {% if item.final_price %}
-                          {% set total = total + (item.final_price * item.quantity) %}
-                        {% elif item.product and item.product.sellingprice %}
-                          {% set total = total + (item.product.sellingprice * item.quantity) %}
-                        {% endif %}
-                      {% endfor %}
-                      <strong>KSh {{ "%.2f"|format(total) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(order.calculated_total) }}</strong>
                     </td>
                     <td>
                       {% if order.approvalstatus %}

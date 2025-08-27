@@ -197,9 +197,19 @@
                         </div>
                         {% endif %}
                         <div>
-                          <div class="fw-bold">{{ item.product.name if item.product else 'Product Not Found' }}</div>
+                          <div class="fw-bold">
+                            {% if item.product %}
+                              {{ item.product.name }}
+                            {% elif item.product_name %}
+                              {{ item.product_name }}
+                            {% else %}
+                              Product Not Found
+                            {% endif %}
+                          </div>
                           {% if item.product and item.product.productcode %}
                           <small class="text-muted">Code: {{ item.product.productcode }}</small>
+                          {% elif item.product_name %}
+                          <small class="text-muted">Manual Entry</small>
                           {% endif %}
                         </div>
                       </div>

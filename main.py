@@ -21,6 +21,7 @@ import os
 from config import Config
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_, func, and_
+from sqlalchemy.orm import joinedload
 
 from extensions import db
 
@@ -1246,8 +1247,13 @@ def orders():
         payment_filter = request.args.get('payment_status', '')
         branch_filter = request.args.get('branch_id', type=int)
         
-        # Base query with joins
-        base_query = db.session.query(Order).join(User).join(OrderType).join(Branch)
+        # Base query with joins and eager loading
+        base_query = db.session.query(Order).options(
+            db.joinedload(Order.user),
+            db.joinedload(Order.ordertype),
+            db.joinedload(Order.branch),
+            db.joinedload(Order.order_items).joinedload(OrderItem.product)
+        )
         
         # Apply filters
         if status_filter:
@@ -1275,15 +1281,53 @@ def orders():
         orders = pagination.items
         print(f"Orders found: {len(orders)}")
         
+        # Debug: Check the first order's data
+        if orders:
+            first_order = orders[0]
+            print(f"First order ID: {first_order.id}")
+            print(f"First order user: {first_order.user.firstname if first_order.user else 'No user'}")
+            print(f"First order branch: {first_order.branch.name if first_order.branch else 'No branch'}")
+            print(f"First order items count: {len(first_order.order_items) if first_order.order_items else 0}")
+            
+            if first_order.order_items:
+                first_item = first_order.order_items[0]
+                print(f"First item product: {first_item.product.name if first_item.product else 'No product'}")
+                print(f"First item final_price: {first_item.final_price}")
+                print(f"First item product sellingprice: {first_item.product.sellingprice if first_item.product else 'No product'}")
+        
         # Calculate and update payment status for all orders
         for order in orders:
+            print(f"\nCalculating total for order {order.id}:")
             # Calculate order total
             total_amount = 0
             for item in order.order_items:
+                print(f"  Item {item.id}: quantity={item.quantity}, final_price={item.final_price}")
+                
+                # Handle both cases: products with relationships and manually entered items
                 if item.final_price:
-                    total_amount += item.final_price * item.quantity
+                    # Use the final_price if available (for manually entered items or negotiated prices)
+                    item_total = item.final_price * item.quantity
+                    total_amount += item_total
+                    print(f"    Using final_price: {item.final_price} * {item.quantity} = {item_total}")
                 elif item.product and item.product.sellingprice:
-                    total_amount += item.product.sellingprice * item.quantity
+                    # Use product's selling price if no final_price but product relationship exists
+                    item_total = item.product.sellingprice * item.quantity
+                    total_amount += item_total
+                    print(f"    Using product.sellingprice: {item.product.sellingprice} * {item.quantity} = {item_total}")
+                elif hasattr(item, 'product_name') and item.product_name:
+                    # For manually entered items without product relationship, check if they have a price
+                    if item.original_price:
+                        item_total = item.original_price * item.quantity
+                        total_amount += item_total
+                        print(f"    Using original_price for manual item '{item.product_name}': {item.original_price} * {item.quantity} = {item_total}")
+                    else:
+                        print(f"    Manual item '{item.product_name}' has no price available")
+                else:
+                    print(f"    No price available for item {item.id}")
+            
+            print(f"  Order {order.id} total: {total_amount}")
+            # Store the calculated total on the order object for template use
+            order.calculated_total = total_amount
             
             # Calculate total payments received
             total_payments = Decimal('0')

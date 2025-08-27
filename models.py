@@ -131,8 +131,8 @@ class Product(db.Model):
     branchid = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
     name = db.Column(db.String, nullable=False)
     image_url = db.Column(db.String, nullable=True)
-    buyingprice = db.Column(db.Integer, nullable=True)
-    sellingprice = db.Column(db.Integer, nullable=True)
+    buyingprice = db.Column(db.Numeric(10, 2), nullable=True)
+    sellingprice = db.Column(db.Numeric(10, 2), nullable=True)
     stock = db.Column(db.Integer, nullable=True)
     productcode = db.Column(db.String, nullable=True)
     display = db.Column(db.Boolean, default=True)  # Controls visibility in customer app
@@ -198,7 +198,8 @@ class OrderItem(db.Model):
     __tablename__ = 'orderitems'
     id = db.Column(db.Integer, primary_key=True)
     orderid = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
+    product_name = db.Column(db.String(255), nullable=True)  # Product name for both regular and manual items
     quantity = db.Column(db.Integer, nullable=False)
     buying_price = db.Column(db.Numeric(10, 2), nullable=True)  # Product buying price at time of order
     original_price = db.Column(db.Numeric(10, 2), nullable=True)  # Original product selling price
