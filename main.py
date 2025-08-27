@@ -195,9 +195,35 @@ def index():
         print(f"Error getting low stock products count: {e}")
         low_stock_products = 0
     
-    # Recent activities
+    # Recent activities - Load recent orders with proper relationships and calculate totals
     try:
-        recent_orders_list = Order.query.order_by(Order.created_at.desc()).limit(5).all()
+        recent_orders_list = db.session.query(Order).options(
+            db.joinedload(Order.user),
+            db.joinedload(Order.branch),
+            db.joinedload(Order.order_items).joinedload(OrderItem.product)
+        ).order_by(Order.created_at.desc()).limit(5).all()
+        
+        # Calculate totals for each recent order
+        for order in recent_orders_list:
+            total_amount = 0
+            for item in order.order_items:
+                # Handle both cases: products with relationships and manually entered items
+                if item.final_price:
+                    # Use the final_price if available (for manually entered items or negotiated prices)
+                    item_total = item.final_price * item.quantity
+                    total_amount += item_total
+                elif item.product and item.product.sellingprice:
+                    # Use product's selling price if no final_price but product relationship exists
+                    item_total = item.product.sellingprice * item.quantity
+                    total_amount += item_total
+                elif hasattr(item, 'product_name') and item.product_name and item.original_price:
+                    # For manually entered items without product relationship, check if they have a price
+                    item_total = item.original_price * item.quantity
+                    total_amount += item_total
+            
+            # Store the calculated total on the order object for template use
+            order.calculated_total = total_amount
+        
         recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
     except Exception as e:
         print(f"Error getting recent activities: {e}")

@@ -521,18 +521,18 @@
                       </td>
                       <td>{{ order.user.firstname }} {{ order.user.lastname }}</td>
                       <td>
-                        {% for branch in branches %}
-                          {% if branch.id == order.branchid %}
-                            {{ branch.name }}
-                          {% endif %}
-                        {% endfor %}
+                        {% if order.branch %}
+                          {{ order.branch.name }}
+                        {% else %}
+                          <span class="text-muted">N/A</span>
+                        {% endif %}
                       </td>
                       <td>
-                        {% set total = 0 %}
-                        {% for item in order.order_items %}
-                          {% set total = total + (item.final_price * item.quantity) %}
-                        {% endfor %}
-                        KSh {{ "{:,.0f}".format(total) }}
+                        {% if order.calculated_total %}
+                          KSh {{ "{:,.0f}".format(order.calculated_total) }}
+                        {% else %}
+                          <span class="text-muted">N/A</span>
+                        {% endif %}
                       </td>
                       <td>
                         {% if order.approvalstatus %}
