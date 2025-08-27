@@ -107,10 +107,18 @@
                   <div class="form-control-plaintext">
                     {% if products %}
                       {% set total_price = 0 %}
+                      {% set product_count = 0 %}
                       {% for product in products %}
-                        {% set total_price = total_price + product.sellingprice %}
+                        {% if product.sellingprice %}
+                          {% set total_price = total_price + product.sellingprice %}
+                          {% set product_count = product_count + 1 %}
+                        {% endif %}
                       {% endfor %}
-                      <strong>KSh {{ "%.2f"|format(total_price / products|length) }}</strong>
+                      {% if product_count > 0 %}
+                        <strong>KSh {{ "%.2f"|format(total_price / product_count) }}</strong>
+                      {% else %}
+                        <span class="text-muted">No pricing data</span>
+                      {% endif %}
                     {% else %}
                       <span class="text-muted">No products</span>
                     {% endif %}

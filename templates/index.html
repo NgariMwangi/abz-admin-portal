@@ -593,7 +593,7 @@
           </div>
           <div class="card-body">
             {% if top_products %}
-              {% for product, total_sold in top_products %}
+              {% for product, total_sold, avg_final_price in top_products %}
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
                   <h6 class="mb-0">{{ product.name }}</h6>
@@ -601,7 +601,7 @@
                 </div>
                 <div class="text-end">
                   <div class="fw-bold">{{ total_sold }} sold</div>
-                  <small class="text-muted">KSh {{ "{:,.0f}".format(product.sellingprice) }}</small>
+                  <small class="text-muted">KSh {{ "{:,.0f}".format(avg_final_price or product.sellingprice) }}</small>
                 </div>
               </div>
               {% if not loop.last %}<hr>{% endif %}

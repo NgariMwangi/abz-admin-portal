@@ -70,18 +70,10 @@
                       {% endif %}
                     </td>
                     <td>
-                      <span class="badge badge-info">{{ category.products|length }} products</span>
+                      <span class="badge badge-info">{{ category.product_count }} products</span>
                     </td>
                     <td>
-                      {% set category_revenue = 0 %}
-                      {% for product in category.products %}
-                        {% for order_item in product.order_items %}
-                          {% if order_item.order.payment_status == 'paid' %}
-                            {% set category_revenue = category_revenue + (product.sellingprice * order_item.quantity) %}
-                          {% endif %}
-                        {% endfor %}
-                      {% endfor %}
-                      <strong>KSh {{ "%.2f"|format(category_revenue) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(category.calculated_revenue) }}</strong>
                     </td>
                     <td>
                       <div class="btn-group" role="group">
@@ -186,13 +178,7 @@
             <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
               <i class="fas fa-box"></i>
             </div>
-            <h4 class="card-title">
-              {% set total_products = 0 %}
-              {% for category in categories %}
-                {% set total_products = total_products + category.products|length %}
-              {% endfor %}
-              {{ total_products }}
-            </h4>
+            <h4 class="card-title">{{ total_products }}</h4>
             <p class="card-category">Total Products</p>
           </div>
         </div>
@@ -203,19 +189,7 @@
             <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
               <i class="fas fa-money-bill-wave"></i>
             </div>
-            <h4 class="card-title">
-              {% set total_revenue = 0 %}
-              {% for category in categories %}
-                {% for product in category.products %}
-                  {% for order_item in product.order_items %}
-                    {% if order_item.order.payment_status == 'paid' %}
-                      {% set total_revenue = total_revenue + (product.sellingprice * order_item.quantity) %}
-                    {% endif %}
-                  {% endfor %}
-                {% endfor %}
-              {% endfor %}
-              KSh {{ "%.0f"|format(total_revenue) }}
-            </h4>
+            <h4 class="card-title">KSh {{ "%.0f"|format(total_revenue) }}</h4>
             <p class="card-category">Total Revenue</p>
           </div>
         </div>
@@ -226,13 +200,7 @@
             <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
               <i class="fas fa-chart-bar"></i>
             </div>
-            <h4 class="card-title">
-              {% if categories|length > 0 %}
-                {{ "%.1f"|format(total_products / categories|length) }}
-              {% else %}
-                0
-              {% endif %}
-            </h4>
+            <h4 class="card-title">{{ "%.1f"|format(avg_products_per_category) }}</h4>
             <p class="card-category">Avg Products/Category</p>
           </div>
         </div>

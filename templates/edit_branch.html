@@ -67,16 +67,18 @@
                       <div class="col-md-4">
                         <div class="text-center">
                           <div class="fw-bold text-success">
-                            {% set branch_revenue = 0 %}
-                            {% for order in branch.orders %}
-                              {% if order.payment_status == 'paid' %}
-                                {% for item in order.order_items %}
-                                  {% if item.product and item.product.sellingprice %}
-                                    {% set branch_revenue = branch_revenue + (item.product.sellingprice * item.quantity) %}
-                                  {% endif %}
-                                {% endfor %}
-                              {% endif %}
-                            {% endfor %}
+                                                  {% set branch_revenue = 0 %}
+                      {% for order in branch.orders %}
+                        {% if order.payment_status in ['paid', 'partially_paid'] %}
+                          {% for item in order.order_items %}
+                            {% if item.final_price %}
+                              {% set branch_revenue = branch_revenue + (item.final_price * item.quantity) %}
+                            {% elif item.product and item.product.sellingprice %}
+                              {% set branch_revenue = branch_revenue + (item.product.sellingprice * item.quantity) %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endif %}
+                      {% endfor %}
                             KSh {{ "%.0f"|format(branch_revenue) }}
                           </div>
                           <small class="text-muted">Revenue</small>

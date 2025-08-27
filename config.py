@@ -1,13 +1,14 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 # Load environment variables from .env file if it exists
 load_dotenv()
 
 class Config:
-    SECRET_KEY = 'your-secret-key-here'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'abz-hardware-secret-key-2024-secure-random-string'
     # SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:deno0707@localhost/abzone'
-    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:#Deno0707@69.197.187.23:5432/abzone'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:%23Deno0707@69.197.187.23:5432/abzone'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Cloudinary Configuration
@@ -19,4 +20,10 @@ class Config:
     # File Upload Configuration
     UPLOAD_FOLDER = 'static/uploads/products'
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'heic', 'heif'}
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size 
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+    
+    # Session Configuration
+    SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=24)  # 24 hour session lifetime 

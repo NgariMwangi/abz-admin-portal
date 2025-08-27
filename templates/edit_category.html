@@ -130,8 +130,12 @@
                     {% set category_revenue = 0 %}
                     {% for product in category.products %}
                       {% for order_item in product.order_items %}
-                        {% if order_item.order.payment_status == 'paid' %}
-                          {% set category_revenue = category_revenue + (product.sellingprice * order_item.quantity) %}
+                        {% if order_item.order.payment_status in ['paid', 'partially_paid'] %}
+                          {% if order_item.final_price %}
+                            {% set category_revenue = category_revenue + (order_item.final_price * order_item.quantity) %}
+                          {% elif product.sellingprice %}
+                            {% set category_revenue = category_revenue + (product.sellingprice * order_item.quantity) %}
+                          {% endif %}
                         {% endif %}
                       {% endfor %}
                     {% endfor %}

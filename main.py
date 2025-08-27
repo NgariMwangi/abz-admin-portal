@@ -2,12 +2,13 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
+import csv
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from io import BytesIO
+from io import BytesIO, StringIO
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -19,7 +20,7 @@ from werkzeug.utils import secure_filename
 import os
 from config import Config
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import or_
+from sqlalchemy import or_, func, and_
 
 from extensions import db
 
@@ -61,10 +62,10 @@ def role_required(roles):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
-                return redirect(url_for('login_post', next=request.url))
-            if current_user.role not in roles:
+                return redirect(url_for('login', next=request.url))
+            if not hasattr(current_user, 'role') or current_user.role not in roles:
                 flash('You do not have permission to access this page.', 'danger')
-                return redirect(url_for('index'))
+                return redirect(url_for('login'))
             return f(*args, **kwargs)
         return decorated_function
     return wrapper
@@ -73,123 +74,186 @@ def role_required(roles):
 @login_required
 @role_required(['admin']) 
 def index():
-    if not current_user.is_authenticated:
-        return redirect(url_for('login_post'))
-    
-    # Get real business data
-    from sqlalchemy import func, and_
-    from datetime import datetime, timedelta
-    
-    # Current date in EAT timezone
-    now = datetime.now(EAT)
-    today = now.date()
-    this_month = now.replace(day=1)
-    last_month = (this_month - timedelta(days=1)).replace(day=1)
+    try:
+        # Get real business data
+       
+        
+        # Current date in EAT timezone
+        now = datetime.now(EAT)
+        today = now.date()
+        this_month = now.replace(day=1)
+        last_month = (this_month - timedelta(days=1)).replace(day=1)
+    except Exception as e:
+        print(f"Error in index route setup: {e}")
+        flash('An error occurred while loading dashboard data. Please try again.', 'error')
+        return redirect(url_for('login'))
     
     # Dashboard statistics
-    total_users = User.query.count()
-    total_products = Product.query.count()
-    total_orders = Order.query.count()
-    total_branches = Branch.query.count()
+    try:
+        total_users = User.query.count()
+        total_products = Product.query.count()
+        total_orders = Order.query.count()
+        total_branches = Branch.query.count()
+    except Exception as e:
+        print(f"Error getting basic statistics: {e}")
+        total_users = 0
+        total_products = 0
+        total_orders = 0
+        total_branches = 0
     
     # Total product asset value (buying price * stock quantity)
     # Exclude products with no buying price, zero stock, or null stock
-    total_product_asset = db.session.query(
-        func.sum(Product.buyingprice * Product.stock)
-    ).filter(
-        and_(
-            Product.buyingprice.isnot(None),  # Exclude products with no buying price
-            Product.buyingprice > 0,          # Exclude products with zero buying price
-            Product.stock.isnot(None),        # Exclude products with null stock
-            Product.stock > 0                 # Exclude products with zero stock
-        )
-    ).scalar() or 0
+    try:
+        total_product_asset = db.session.query(
+            func.sum(Product.buyingprice * Product.stock)
+        ).filter(
+            and_(
+                Product.buyingprice.isnot(None),  # Exclude products with no buying price
+                Product.buyingprice > 0,          # Exclude products with zero buying price
+                Product.stock.isnot(None),        # Exclude products with null stock
+                Product.stock > 0                 # Exclude products with zero stock
+            )
+        ).scalar() or 0
+    except Exception as e:
+        print(f"Error calculating total product asset: {e}")
+        total_product_asset = 0
     
     # Product asset statistics
-    products_with_assets = db.session.query(Product).filter(
-        and_(
-            Product.buyingprice.isnot(None),
-            Product.buyingprice > 0,
-            Product.stock.isnot(None),
-            Product.stock > 0
-        )
-    ).count()
-    
-    products_without_buying_price = db.session.query(Product).filter(
-        or_(
-            Product.buyingprice.is_(None),
-            Product.buyingprice == 0
-        )
-    ).count()
-    
-    products_with_zero_stock = db.session.query(Product).filter(
-        or_(
-            Product.stock.is_(None),
-            Product.stock == 0
-        )
-    ).count()
+    try:
+        products_with_assets = db.session.query(Product).filter(
+            and_(
+                Product.buyingprice.isnot(None),
+                Product.buyingprice > 0,
+                Product.stock.isnot(None),
+                Product.stock > 0
+            )
+        ).count()
+        
+        products_without_buying_price = db.session.query(Product).filter(
+            or_(
+                Product.buyingprice.is_(None),
+                Product.buyingprice == 0
+            )
+        ).count()
+        
+        products_with_zero_stock = db.session.query(Product).filter(
+            or_(
+                Product.stock.is_(None),
+                Product.stock == 0
+            )
+        ).count()
+    except Exception as e:
+        print(f"Error getting product asset statistics: {e}")
+        products_with_assets = 0
+        products_without_buying_price = 0
+        products_with_zero_stock = 0
     
     # Average asset value per product (excluding products without assets)
     avg_asset_per_product = total_product_asset / products_with_assets if products_with_assets > 0 else 0
     
     # Recent orders (last 7 days)
-    recent_orders = Order.query.filter(
-        Order.created_at >= today - timedelta(days=7)
-    ).count()
+    try:
+        recent_orders = Order.query.filter(
+            Order.created_at >= today - timedelta(days=7)
+        ).count()
+    except Exception as e:
+        print(f"Error getting recent orders count: {e}")
+        recent_orders = 0
     
     # Pending orders
-    pending_orders = Order.query.filter_by(approvalstatus=False).count()
+    try:
+        pending_orders = Order.query.filter_by(approvalstatus=False).count()
+    except Exception as e:
+        print(f"Error getting pending orders count: {e}")
+        pending_orders = 0
     
     # Total revenue (from approved orders)
-    total_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
-        Order, OrderItem.orderid == Order.id
-    ).filter(Order.approvalstatus == True).scalar() or 0
+    try:
+        total_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(Order.approvalstatus == True).scalar() or 0
+    except Exception as e:
+        print(f"Error calculating total revenue: {e}")
+        total_revenue = 0
     
     # Monthly revenue
-    monthly_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
-        Order, OrderItem.orderid == Order.id
-    ).filter(
-        and_(Order.approvalstatus == True, Order.created_at >= this_month)
-    ).scalar() or 0
+    try:
+        monthly_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
+            and_(Order.approvalstatus == True, Order.created_at >= this_month)
+        ).scalar() or 0
+    except Exception as e:
+        print(f"Error calculating monthly revenue: {e}")
+        monthly_revenue = 0
     
     # Low stock products (less than 10 items)
-    low_stock_products = Product.query.filter(Product.stock < 10).count()
+    try:
+        low_stock_products = Product.query.filter(Product.stock < 10).count()
+    except Exception as e:
+        print(f"Error getting low stock products count: {e}")
+        low_stock_products = 0
     
     # Recent activities
-    recent_orders_list = Order.query.order_by(Order.created_at.desc()).limit(5).all()
-    recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    try:
+        recent_orders_list = Order.query.order_by(Order.created_at.desc()).limit(5).all()
+        recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    except Exception as e:
+        print(f"Error getting recent activities: {e}")
+        recent_orders_list = []
+        recent_users = []
     
     # Branch statistics
     branch_stats = []
-    for branch in Branch.query.all():
-        branch_products = Product.query.filter_by(branchid=branch.id).count()
-        branch_orders = Order.query.filter_by(branchid=branch.id).count()
-        branch_stats.append({
-            'branch': branch,
-            'products': branch_products,
-            'orders': branch_orders
-        })
+    try:
+        for branch in Branch.query.all():
+            try:
+                branch_products = Product.query.filter_by(branchid=branch.id).count()
+                branch_orders = Order.query.filter_by(branchid=branch.id).count()
+                branch_stats.append({
+                    'branch': branch,
+                    'products': branch_products,
+                    'orders': branch_orders
+                })
+            except Exception as e:
+                print(f"Error getting stats for branch {branch.id}: {e}")
+                branch_stats.append({
+                    'branch': branch,
+                    'products': 0,
+                    'orders': 0
+                })
+    except Exception as e:
+        print(f"Error getting branch statistics: {e}")
+        branch_stats = []
     
     # Top selling products
-    top_products = db.session.query(
-        Product, func.sum(OrderItem.quantity).label('total_sold')
-    ).join(OrderItem, Product.id == OrderItem.productid).join(
-        Order, OrderItem.orderid == Order.id
-    ).filter(Order.approvalstatus == True).group_by(Product.id).order_by(
-        func.sum(OrderItem.quantity).desc()
-    ).limit(5).all()
+    try:
+        top_products = db.session.query(
+            Product, func.sum(OrderItem.quantity).label('total_sold'), func.avg(OrderItem.final_price).label('avg_final_price')
+        ).join(OrderItem, Product.id == OrderItem.productid).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(Order.approvalstatus == True).group_by(Product.id).order_by(
+            func.sum(OrderItem.quantity).desc()
+        ).limit(5).all()
+    except Exception as e:
+        print(f"Error getting top products: {e}")
+        top_products = []
     
     # Top products by asset value (buying price * stock)
-    top_products_by_asset_value = db.session.query(
-        Product, (Product.buyingprice * Product.stock).label('asset_value')
-    ).filter(
-        and_(
-            Product.buyingprice.isnot(None),
-            Product.buyingprice > 0,
-            Product.stock.isnot(None),
-            Product.stock > 0
-        )
-    ).order_by((Product.buyingprice * Product.stock).desc()).limit(5).all()
+    try:
+        top_products_by_asset_value = db.session.query(
+            Product, (Product.buyingprice * Product.stock).label('asset_value')
+        ).filter(
+            and_(
+                Product.buyingprice.isnot(None),
+                Product.buyingprice > 0,
+                Product.stock.isnot(None),
+                Product.stock > 0
+            )
+        ).order_by((Product.buyingprice * Product.stock).desc()).limit(5).all()
+    except Exception as e:
+        print(f"Error getting top products by asset value: {e}")
+        top_products_by_asset_value = []
     
     # Calculate percentage of total assets for each top product
     top_products_with_percentage = []
@@ -202,71 +266,78 @@ def index():
         })
     
     # Expense statistics
-    total_expenses = Expense.query.count()
-    pending_expenses = Expense.query.filter_by(status='pending').count()
-    approved_expenses = Expense.query.filter_by(status='approved').count()
-    total_expense_amount = db.session.query(func.sum(Expense.amount)).filter_by(status='approved').scalar() or 0
-    monthly_expenses = db.session.query(func.sum(Expense.amount)).filter(
-        and_(Expense.status == 'approved', Expense.expense_date >= this_month)
-    ).scalar() or 0
+    try:
+        total_expenses = Expense.query.count()
+        pending_expenses = Expense.query.filter_by(status='pending').count()
+        approved_expenses = Expense.query.filter_by(status='approved').count()
+        total_expense_amount = db.session.query(func.sum(Expense.amount)).filter_by(status='approved').scalar() or 0
+        monthly_expenses = db.session.query(func.sum(Expense.amount)).filter(
+            and_(Expense.status == 'approved', Expense.expense_date >= this_month)
+        ).scalar() or 0
+    except Exception as e:
+        print(f"Error getting expense statistics: {e}")
+        total_expenses = 0
+        pending_expenses = 0
+        approved_expenses = 0
+        total_expense_amount = 0
+        monthly_expenses = 0
     
-    return render_template("index.html", 
-                         total_users=total_users,
-                         total_products=total_products,
-                         total_orders=total_orders,
-                         total_branches=total_branches,
-                         recent_orders=recent_orders,
-                         pending_orders=pending_orders,
-                         total_revenue=total_revenue,
-                         monthly_revenue=monthly_revenue,
-                         low_stock_products=low_stock_products,
-                         recent_orders_list=recent_orders_list,
-                         recent_users=recent_users,
-                         branch_stats=branch_stats,
-                         top_products=top_products,
-                         top_products_by_asset_value=top_products_by_asset_value,
-                         top_products_with_percentage=top_products_with_percentage,
-                         total_expenses=total_expenses,
-                         pending_expenses=pending_expenses,
-                         approved_expenses=approved_expenses,
-                         total_expense_amount=total_expense_amount,
-                         monthly_expenses=monthly_expenses,
-                         total_product_asset=total_product_asset,
-                         products_with_assets=products_with_assets,
-                         products_without_buying_price=products_without_buying_price,
-                         products_with_zero_stock=products_with_zero_stock,
-                         avg_asset_per_product=avg_asset_per_product)
+    try:
+        return render_template("index.html", 
+                             total_users=total_users,
+                             total_products=total_products,
+                             total_orders=total_orders,
+                             total_branches=total_branches,
+                             recent_orders=recent_orders,
+                             pending_orders=pending_orders,
+                             total_revenue=total_revenue,
+                             monthly_revenue=monthly_revenue,
+                             low_stock_products=low_stock_products,
+                             recent_orders_list=recent_orders_list,
+                             recent_users=recent_users,
+                             branch_stats=branch_stats,
+                             top_products=top_products,
+                             top_products_by_asset_value=top_products_by_asset_value,
+                             top_products_with_percentage=top_products_with_percentage,
+                             total_expenses=total_expenses,
+                             pending_expenses=pending_expenses,
+                             approved_expenses=approved_expenses,
+                             total_expense_amount=total_expense_amount,
+                             monthly_expenses=monthly_expenses,
+                             total_product_asset=total_product_asset,
+                             products_with_assets=products_with_assets,
+                             products_without_buying_price=products_without_buying_price,
+                             products_with_zero_stock=products_with_zero_stock,
+                             avg_asset_per_product=avg_asset_per_product)
+    except Exception as e:
+        print(f"Error in index route: {e}")
+        flash('An error occurred while loading dashboard data. Please try again.', 'error')
+        return redirect(url_for('login'))
 
 @app.route("/login", methods=["GET", "POST"])
-def login_post():
+def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
         
     if request.method == "POST":
         email = request.form.get("email")
         password = request.form.get("password")
-        print(email)
-        print(password)
+        
+        if not email or not password:
+            flash('Please provide both email and password.', 'danger')
+            return render_template("login.html")
         
         user = User.query.filter_by(email=email).first()
-        if user and user.check_password(password):
-            # Password is correct
-            pass
-        else:
-            user = None
-        print(user)
-        # Check if user exists and password is correct
-        if not user:
-            print("User not found")
-            flash('Please check your login details and try again.', 'danger')
-            return redirect(url_for('login_post'))
-            
-        # If the above check passes, log the user in
-        login_user(user)
         
-        # Redirect to the page the user was trying to access or home
-        next_page = request.args.get('next')
-        return redirect(next_page or url_for('index'))
+        if user and user.check_password(password):
+            login_user(user, remember=True)
+            next_page = request.args.get('next')
+            if next_page and next_page.startswith('/'):
+                return redirect(next_page)
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid email or password. Please try again.', 'danger')
+            return render_template("login.html")
     
     return render_template("login.html")
 
@@ -321,7 +392,7 @@ def register():
             db.session.add(new_user)
             db.session.commit()
             flash('Admin user registered successfully! You can now login.', 'success')
-            return redirect(url_for('login_post'))
+            return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
             print(f"Error registering user: {e}")
@@ -334,7 +405,8 @@ def register():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login_post'))
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('login'))
 
 # Example of a protected route
 @app.route("/dashboard")
@@ -455,7 +527,7 @@ def products():
         base_query = base_query.filter(Product.display == False)
     
     # Apply pagination
-    pagination = base_query.order_by(Product.name).paginate(
+    pagination = base_query.order_by(Product.id).paginate(
         page=page, 
         per_page=per_page, 
         error_out=False
@@ -486,6 +558,71 @@ def products():
                              search=search,
                              category_filter=category_filter,
                              display_filter=display_filter)
+
+@app.route('/export_products_csv')
+@login_required
+@role_required(['admin'])
+def export_products_csv():
+    try:
+        # Get branch filter from query parameter
+        branch_id = request.args.get('branch_id', type=int)
+        
+        # Base query with joins
+        base_query = Product.query.join(
+            SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+        ).join(
+            Category, SubCategory.category_id == Category.id, isouter=True
+        ).join(
+            Branch, Product.branchid == Branch.id, isouter=True
+        )
+        
+        # Apply branch filter if specified
+        if branch_id:
+            base_query = base_query.filter(Product.branchid == branch_id)
+        
+        # Get all products
+        products = base_query.all()
+        
+        # Create CSV data
+        csv_data = []
+        csv_data.append([
+            'Product ID', 'Product Code', 'Product Name', 'Category', 'Subcategory', 
+            'Branch', 'Buying Price', 'Selling Price', 'Stock', 'Display Status', 
+            'Created Date', 'Updated Date'
+        ])
+        
+        for product in products:
+            csv_data.append([
+                product.id,
+                product.productcode or '',
+                product.name or '',
+                product.sub_category.category.name if product.sub_category and product.sub_category.category else '',
+                product.sub_category.name if product.sub_category else '',
+                product.branch.name if product.branch else '',
+                float(product.buyingprice) if product.buyingprice else 0.0,
+                float(product.sellingprice) if product.sellingprice else 0.0,
+                product.stock or 0,
+                'Visible' if product.display else 'Hidden',
+                product.created_at.strftime('%Y-%m-%d %H:%M:%S') if product.created_at else '',
+                product.updated_at.strftime('%Y-%m-%d %H:%M:%S') if product.updated_at else ''
+            ])
+        
+        # Create CSV response
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerows(csv_data)
+        
+        # Create response
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = 'attachment; filename=products_export.csv'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error exporting products to CSV: {e}")
+        flash('An error occurred while exporting products.', 'error')
+        return redirect(url_for('products'))
 
 @app.route('/branch_products/<int:branch_id>')
 @login_required
@@ -533,7 +670,7 @@ def branch_products(branch_id):
         base_query = base_query.filter(Product.display == False)
     
     # Apply pagination
-    pagination = base_query.order_by(Product.name).paginate(
+    pagination = base_query.order_by(Product.id).paginate(
         page=page, 
         per_page=per_page, 
         error_out=False
@@ -1138,6 +1275,41 @@ def orders():
         orders = pagination.items
         print(f"Orders found: {len(orders)}")
         
+        # Calculate and update payment status for all orders
+        for order in orders:
+            # Calculate order total
+            total_amount = 0
+            for item in order.order_items:
+                if item.final_price:
+                    total_amount += item.final_price * item.quantity
+                elif item.product and item.product.sellingprice:
+                    total_amount += item.product.sellingprice * item.quantity
+            
+            # Calculate total payments received
+            total_payments = Decimal('0')
+            for payment in order.payments:
+                if payment.payment_status == 'completed':
+                    total_payments += Decimal(str(payment.amount))
+            
+            # Determine payment status
+            if total_payments >= total_amount:
+                payment_status = 'paid'
+            elif total_payments > 0:
+                payment_status = 'partially_paid'
+            else:
+                payment_status = 'not_paid'
+            
+            # Update the order's payment_status field if it's different
+            if order.payment_status != payment_status:
+                order.payment_status = payment_status
+        
+        # Commit all payment status updates
+        try:
+            db.session.commit()
+        except Exception as e:
+            print(f"Error updating payment statuses: {e}")
+            db.session.rollback()
+        
         # Get filter options
         branches = Branch.query.order_by(Branch.name).all()
         
@@ -1164,10 +1336,35 @@ def order_details(order_id):
         # Calculate order total
         total_amount = 0
         for item in order.order_items:
-            if item.product and item.product.sellingprice:
+            if item.final_price:
+                total_amount += item.final_price * item.quantity
+            elif item.product and item.product.sellingprice:
                 total_amount += item.product.sellingprice * item.quantity
         
-        return render_template('order_details.html', order=order, total_amount=total_amount)
+        # Calculate payment status based on actual payments received
+        total_payments = Decimal('0')
+        for payment in order.payments:
+            if payment.payment_status == 'completed':
+                total_payments += Decimal(str(payment.amount))
+        
+        # Determine payment status
+        if total_payments >= total_amount:
+            payment_status = 'paid'
+        elif total_payments > 0:
+            payment_status = 'partially_paid'
+        else:
+            payment_status = 'not_paid'
+        
+        # Update the order's payment_status field
+        if order.payment_status != payment_status:
+            order.payment_status = payment_status
+            try:
+                db.session.commit()
+            except Exception as e:
+                print(f"Error updating payment status: {e}")
+                db.session.rollback()
+        
+        return render_template('order_details.html', order=order, total_amount=total_amount, total_payments=total_payments, payment_status=payment_status)
     except Exception as e:
         print(f"Error in order details route: {e}")
         flash('An error occurred while loading order details.', 'error')
@@ -1229,11 +1426,11 @@ def profit_loss():
         
         # Calculate Revenue (from completed orders)
         revenue_query = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.sellingprice)
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
         ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
-            Order.payment_status == 'paid',
+            Order.payment_status.in_(['paid', 'partially_paid']),
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
         )
@@ -1245,7 +1442,7 @@ def profit_loss():
         ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
-            Order.payment_status == 'paid',
+            Order.payment_status.in_(['paid', 'partially_paid']),
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
         )
@@ -1286,7 +1483,7 @@ def profit_loss():
         ).count()
         
         paid_orders = Order.query.filter(
-            Order.payment_status == 'paid',
+            Order.payment_status.in_(['paid', 'partially_paid']),
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
         ).count()
@@ -1295,11 +1492,11 @@ def profit_loss():
         top_products = db.session.query(
             Product.name,
             db.func.sum(OrderItem.quantity).label('total_quantity'),
-            db.func.sum(OrderItem.quantity * Product.sellingprice).label('total_revenue')
+            db.func.sum(OrderItem.quantity * OrderItem.final_price).label('total_revenue')
         ).select_from(Product).join(OrderItem, Product.id == OrderItem.productid).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
-            Order.payment_status == 'paid',
+            Order.payment_status.in_(['paid', 'partially_paid']),
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
         ).group_by(Product.id, Product.name).order_by(
@@ -1373,7 +1570,7 @@ def balance_sheet():
         
         # Accounts Receivable (pending payments)
         accounts_receivable = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.sellingprice)
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
         ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
@@ -1398,11 +1595,11 @@ def balance_sheet():
         # Calculate Equity
         # Retained Earnings (simplified calculation)
         total_revenue = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.sellingprice)
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
         ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
-            Order.payment_status == 'paid',
+            Order.payment_status.in_(['paid', 'partially_paid']),
             Order.created_at <= as_of_dt
         ).scalar() or 0
         
@@ -1411,7 +1608,7 @@ def balance_sheet():
         ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
-            Order.payment_status == 'paid',
+            Order.payment_status.in_(['paid', 'partially_paid']),
             Order.created_at <= as_of_dt
         ).scalar() or 0
         
@@ -1482,12 +1679,155 @@ def branches():
         branches = pagination.items
         print(f"Branches found: {len(branches)}")
         
+        # Update payment status for all orders in all branches
+        for branch in branches:
+            print(f"Processing branch: {branch.name} with {len(branch.orders)} orders")
+            
+            for order in branch.orders:
+                print(f"  Order {order.id}: payment_status={order.payment_status}, items={len(order.order_items)}")
+                
+                # Calculate order total
+                total_amount = 0
+                for item in order.order_items:
+                    if item.final_price:
+                        total_amount += item.final_price * item.quantity
+                    elif item.product and item.product.sellingprice:
+                        total_amount += item.product.sellingprice * item.quantity
+                
+                # Calculate total payments received
+                total_payments = Decimal('0')
+                for payment in order.payments:
+                    if payment.payment_status == 'completed':
+                        total_payments += Decimal(str(payment.amount))
+                
+                print(f"    Total amount: {total_amount}, Total payments: {total_payments}")
+                
+                # Determine payment status
+                if total_payments >= total_amount:
+                    payment_status = 'paid'
+                elif total_payments > 0:
+                    payment_status = 'partially_paid'
+                else:
+                    payment_status = 'not_paid'
+                
+                print(f"    Calculated status: {payment_status}")
+                
+                # Update the order's payment_status field if it's different
+                if order.payment_status != payment_status:
+                    order.payment_status = payment_status
+                    print(f"    Updated status from {order.payment_status} to {payment_status}")
+            
+            print(f"Branch {branch.name} revenue: {branch.revenue}")
+            print(f"  - Orders: {len(branch.orders)}")
+            for order in branch.orders:
+                print(f"    Order {order.id}: {len(order.payments)} payments")
+                for payment in order.payments:
+                    print(f"      Payment {payment.id}: {payment.amount} ({payment.payment_status})")
+        
+        # Commit all payment status updates
+        try:
+            db.session.commit()
+        except Exception as e:
+            print(f"Error updating payment statuses: {e}")
+            db.session.rollback()
+        
         return render_template('branches.html', branches=branches, pagination=pagination)
     except Exception as e:
         print(f"Error in branches route: {e}")
         db.session.rollback()
         flash('An error occurred while loading branches. Please try again.', 'error')
         return redirect(url_for('index'))
+
+@app.route('/debug_payment_status')
+@login_required
+@role_required(['admin'])
+def debug_payment_status():
+    try:
+        # Get all orders with their payment status
+        orders = Order.query.all()
+        debug_info = []
+        
+        for order in orders:
+            # Calculate order total
+            total_amount = 0
+            for item in order.order_items:
+                if item.final_price:
+                    total_amount += item.final_price * item.quantity
+                elif item.product and item.product.sellingprice:
+                    total_amount += item.product.sellingprice * item.quantity
+            
+            # Calculate total payments received
+            total_payments = Decimal('0')
+            for payment in order.payments:
+                if payment.payment_status == 'completed':
+                    total_payments += Decimal(str(payment.amount))
+            
+            # Determine payment status
+            if total_payments >= total_amount:
+                payment_status = 'paid'
+            elif total_payments > 0:
+                payment_status = 'partially_paid'
+            else:
+                payment_status = 'not_paid'
+            
+            debug_info.append({
+                'order_id': order.id,
+                'current_status': order.payment_status,
+                'calculated_status': payment_status,
+                'total_amount': total_amount,
+                'total_payments': total_payments,
+                'payment_count': len(order.payments)
+            })
+        
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        print(f"Error in debug route: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/debug_branches_revenue')
+@login_required
+@role_required(['admin'])
+def debug_branches_revenue():
+    try:
+        branches = Branch.query.all()
+        debug_info = []
+        
+        for branch in branches:
+            branch_data = {
+                'branch_id': branch.id,
+                'branch_name': branch.name,
+                'orders_count': len(branch.orders),
+                'revenue': float(branch.revenue),
+                'orders': []
+            }
+            
+            for order in branch.orders:
+                order_data = {
+                    'order_id': order.id,
+                    'payment_status': order.payment_status,
+                    'payments_count': len(order.payments),
+                    'payments': []
+                }
+                
+                for payment in order.payments:
+                    payment_data = {
+                        'payment_id': payment.id,
+                        'amount': float(payment.amount) if payment.amount else 0,
+                        'payment_status': payment.payment_status,
+                        'payment_method': payment.payment_method
+                    }
+                    order_data['payments'].append(payment_data)
+                
+                branch_data['orders'].append(order_data)
+            
+            debug_info.append(branch_data)
+        
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        print(f"Error in debug branches revenue route: {e}")
+        return jsonify({'error': str(e)})
 
 @app.route('/add_branch', methods=['GET', 'POST'])
 @login_required
@@ -1609,10 +1949,10 @@ def branch_details(branch_id):
         
         # Calculate branch revenue
         branch_revenue = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.sellingprice)
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
         ).join(Product).join(Order).filter(
             Order.branchid == branch_id,
-            Order.payment_status == 'paid'
+            Order.payment_status.in_(['paid', 'partially_paid'])
         ).scalar() or 0
         
         return render_template('branch_details.html', 
@@ -1633,13 +1973,17 @@ def branch_details(branch_id):
 @role_required(['admin'])
 def categories():
     try:
+        import time
+        start_time = time.time()
         print("Categories route accessed")
         # Pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         
-        # Get all categories with pagination
-        pagination = Category.query.paginate(
+        # Get all categories with pagination and eager loading
+        pagination = Category.query.options(
+            db.joinedload(Category.sub_categories)
+        ).paginate(
             page=page, 
             per_page=per_page, 
             error_out=False
@@ -1648,7 +1992,108 @@ def categories():
         categories = pagination.items
         print(f"Categories found: {len(categories)}")
         
-        return render_template('categories.html', categories=categories, pagination=pagination)
+        # Pre-calculate product counts and revenue for all categories in efficient queries
+        category_ids = [cat.id for cat in categories]
+        print(f"Processing {len(category_ids)} categories: {category_ids}")
+        
+        try:
+            # Method 1: Try complex joins first
+            try:
+                # Get product counts for all categories in one query
+                product_counts = db.session.query(
+                    SubCategory.category_id,
+                    db.func.count(Product.id).label('product_count')
+                ).select_from(SubCategory).outerjoin(
+                    Product, SubCategory.id == Product.subcategory_id
+                ).filter(
+                    SubCategory.category_id.in_(category_ids)
+                ).group_by(SubCategory.category_id).all()
+                
+                print(f"Product counts query result: {product_counts}")
+                
+                # Convert to dictionary for easy lookup
+                product_count_dict = {cat_id: count for cat_id, count in product_counts}
+                
+                # Get revenue for all categories in one query
+                revenue_data = db.session.query(
+                    SubCategory.category_id,
+                    db.func.sum(OrderItem.quantity * OrderItem.final_price).label('revenue')
+                ).select_from(SubCategory).join(
+                    Product, SubCategory.id == Product.subcategory_id
+                ).join(
+                    OrderItem, Product.id == OrderItem.productid
+                ).join(
+                    Order, OrderItem.orderid == Order.id
+                ).filter(
+                    SubCategory.category_id.in_(category_ids),
+                    Order.payment_status.in_(['paid', 'partially_paid']),
+                    OrderItem.final_price.isnot(None)
+                ).group_by(SubCategory.category_id).all()
+                
+                print(f"Revenue query result: {revenue_data}")
+                
+                # Convert to dictionary for easy lookup
+                revenue_dict = {cat_id: float(revenue) if revenue else 0.0 for cat_id, revenue in revenue_data}
+                
+            except Exception as join_error:
+                print(f"Complex join failed, using simple approach: {join_error}")
+                # Method 2: Simple approach - calculate for each category individually
+                product_count_dict = {}
+                revenue_dict = {}
+                
+                for category in categories:
+                    # Get subcategories for this category
+                    subcategories = SubCategory.query.filter_by(category_id=category.id).all()
+                    subcategory_ids = [sub.id for sub in subcategories]
+                    
+                    if subcategory_ids:
+                        # Count products
+                        product_count = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).count()
+                        product_count_dict[category.id] = product_count
+                        
+                        # Calculate revenue
+                        revenue = db.session.query(
+                            db.func.sum(OrderItem.quantity * OrderItem.final_price)
+                        ).join(Product).join(Order).filter(
+                            Product.subcategory_id.in_(subcategory_ids),
+                            Order.payment_status.in_(['paid', 'partially_paid']),
+                            OrderItem.final_price.isnot(None)
+                        ).scalar() or 0
+                        revenue_dict[category.id] = float(revenue)
+                    else:
+                        product_count_dict[category.id] = 0
+                        revenue_dict[category.id] = 0.0
+            
+            # Add calculated values to category objects
+            for category in categories:
+                category.product_count = product_count_dict.get(category.id, 0)
+                category.calculated_revenue = revenue_dict.get(category.id, 0.0)
+            
+            # Calculate summary totals efficiently
+            total_products = sum(product_count_dict.values())
+            total_revenue = sum(revenue_dict.values())
+            avg_products_per_category = total_products / len(categories) if categories else 0
+            
+        except Exception as e:
+            print(f"Error in data calculation: {e}")
+            # Fallback to simple values if queries fail
+            for category in categories:
+                category.product_count = 0
+                category.calculated_revenue = 0.0
+            
+            total_products = 0
+            total_revenue = 0.0
+            avg_products_per_category = 0.0
+        
+        execution_time = time.time() - start_time
+        print(f"Categories route executed in {execution_time:.2f} seconds")
+        
+        return render_template('categories.html', 
+                             categories=categories, 
+                             pagination=pagination,
+                             total_products=total_products,
+                             total_revenue=total_revenue,
+                             avg_products_per_category=avg_products_per_category)
     except Exception as e:
         print(f"Error in categories route: {e}")
         db.session.rollback()
@@ -1670,14 +2115,14 @@ def category_details(category_id):
         if subcategory_ids:
             # New structure: products through subcategories
             total_products = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).count()
-            products = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).all()
+            products = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).order_by(Product.id).all()
             
             # Calculate category revenue
             category_revenue = db.session.query(
-                db.func.sum(OrderItem.quantity * Product.sellingprice)
+                db.func.sum(OrderItem.quantity * OrderItem.final_price)
             ).join(Product).join(Order).filter(
                 Product.subcategory_id.in_(subcategory_ids),
-                Order.payment_status == 'paid'
+                Order.payment_status.in_(['paid', 'partially_paid'])
             ).scalar() or 0
             
             # Get products by branch
@@ -1889,10 +2334,10 @@ def subcategory_details(subcategory_id):
         
         # Calculate subcategory revenue
         subcategory_revenue = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.sellingprice)
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
         ).join(Product).join(Order).filter(
             Product.subcategory_id == subcategory_id,
-            Order.payment_status == 'paid'
+            Order.payment_status.in_(['paid', 'partially_paid'])
         ).scalar() or 0
         
         # Get products by branch
@@ -3197,16 +3642,24 @@ def export_purchase_order_pdf(po_id):
 @app.errorhandler(IntegrityError)
 def handle_integrity_error(error):
     db.session.rollback()
+    print(f"Integrity error: {error}")
     flash('Cannot perform this action. The record has associated data that prevents deletion.', 'error')
-    # Try to redirect back to the referring page, or to index if no referrer
-    return redirect(request.referrer or url_for('index'))
+    # Only redirect if we have a valid referrer and it's not the same page
+    if request.referrer and request.referrer != request.url:
+        return redirect(request.referrer)
+    # Fallback to login if no valid referrer
+    return redirect(url_for('login'))
 
 @app.errorhandler(Exception)
 def handle_general_error(error):
     db.session.rollback()
+    print(f"General error: {error}")
     flash('An unexpected error occurred. Please try again.', 'error')
-    # Try to redirect back to the referring page, or to index if no referrer
-    return redirect(request.referrer or url_for('index'))
+    # Only redirect if we have a valid referrer and it's not the same page
+    if request.referrer and request.referrer != request.url:
+        return redirect(request.referrer)
+    # Fallback to login if no valid referrer
+    return redirect(url_for('login'))
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required

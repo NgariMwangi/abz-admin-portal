@@ -33,10 +33,9 @@
                 <label for="payment_status" class="form-label">Payment Status</label>
                 <select class="form-control" id="payment_status" name="payment_status">
                   <option value="">All Payments</option>
-                  <option value="pending" {% if payment_filter == 'pending' %}selected{% endif %}>Pending</option>
+                  <option value="not_paid" {% if payment_filter == 'not_paid' %}selected{% endif %}>Not Paid</option>
+                  <option value="partially_paid" {% if payment_filter == 'partially_paid' %}selected{% endif %}>Partially Paid</option>
                   <option value="paid" {% if payment_filter == 'paid' %}selected{% endif %}>Paid</option>
-                  <option value="failed" {% if payment_filter == 'failed' %}selected{% endif %}>Failed</option>
-                  <option value="refunded" {% if payment_filter == 'refunded' %}selected{% endif %}>Refunded</option>
                 </select>
               </div>
               <div class="col-md-3">
@@ -121,7 +120,9 @@
                     <td>
                       {% set total = 0 %}
                       {% for item in order.order_items %}
-                        {% if item.product and item.product.sellingprice %}
+                        {% if item.final_price %}
+                          {% set total = total + (item.final_price * item.quantity) %}
+                        {% elif item.product and item.product.sellingprice %}
                           {% set total = total + (item.product.sellingprice * item.quantity) %}
                         {% endif %}
                       {% endfor %}
@@ -143,17 +144,13 @@
                         <span class="badge badge-success">
                           <i class="fas fa-credit-card"></i> Paid
                         </span>
-                      {% elif order.payment_status == 'pending' %}
+                      {% elif order.payment_status == 'partially_paid' %}
                         <span class="badge badge-warning">
-                          <i class="fas fa-clock"></i> Pending
+                          <i class="fas fa-clock"></i> Partially Paid
                         </span>
-                      {% elif order.payment_status == 'failed' %}
+                      {% elif order.payment_status == 'not_paid' %}
                         <span class="badge badge-danger">
-                          <i class="fas fa-times"></i> Failed
-                        </span>
-                      {% elif order.payment_status == 'refunded' %}
-                        <span class="badge badge-info">
-                          <i class="fas fa-undo"></i> Refunded
+                          <i class="fas fa-times"></i> Not Paid
                         </span>
                       {% else %}
                         <span class="badge badge-secondary">{{ order.payment_status }}</span>
@@ -288,8 +285,19 @@
             <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
               <i class="fas fa-clock"></i>
             </div>
-            <h4 class="card-title">{{ orders|selectattr('payment_status', 'equalto', 'pending')|list|length }}</h4>
-            <p class="card-category">Pending Payment</p>
+            <h4 class="card-title">{{ orders|selectattr('payment_status', 'equalto', 'partially_paid')|list|length }}</h4>
+            <p class="card-category">Partially Paid</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-danger bubble-shadow-small mb-3">
+              <i class="fas fa-times"></i>
+            </div>
+            <h4 class="card-title">{{ orders|selectattr('payment_status', 'equalto', 'not_paid')|list|length }}</h4>
+            <p class="card-category">Not Paid</p>
           </div>
         </div>
       </div>

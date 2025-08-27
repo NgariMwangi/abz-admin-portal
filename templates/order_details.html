@@ -108,25 +108,33 @@
             <div class="mb-3">
               <small class="text-muted">Payment Status</small>
               <div class="mt-1">
-                {% if order.payment_status == 'paid' %}
+                {% if payment_status == 'paid' %}
                   <span class="badge badge-success fs-6">
                     <i class="fas fa-credit-card"></i> Paid
                   </span>
-                {% elif order.payment_status == 'pending' %}
+                {% elif payment_status == 'partially_paid' %}
                   <span class="badge badge-warning fs-6">
-                    <i class="fas fa-clock"></i> Pending
+                    <i class="fas fa-clock"></i> Partially Paid
                   </span>
-                {% elif order.payment_status == 'failed' %}
+                {% elif payment_status == 'not_paid' %}
                   <span class="badge badge-danger fs-6">
-                    <i class="fas fa-times"></i> Failed
-                  </span>
-                {% elif order.payment_status == 'refunded' %}
-                  <span class="badge badge-info fs-6">
-                    <i class="fas fa-undo"></i> Refunded
+                    <i class="fas fa-times"></i> Not Paid
                   </span>
                 {% else %}
-                  <span class="badge badge-secondary fs-6">{{ order.payment_status }}</span>
+                  <span class="badge badge-secondary fs-6">{{ payment_status }}</span>
                 {% endif %}
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <small class="text-muted">Payments Received</small>
+              <div class="fw-bold fs-5 text-success">KSh {{ "%.2f"|format(total_payments) }}</div>
+            </div>
+            
+            <div class="mb-3">
+              <small class="text-muted">Remaining Balance</small>
+              <div class="fw-bold fs-5 {% if (total_amount - total_payments) > 0 %}text-danger{% else %}text-success{% endif %}">
+                KSh {{ "%.2f"|format(total_amount - total_payments) }}
               </div>
             </div>
             
@@ -204,17 +212,21 @@
                       {% endif %}
                     </td>
                     <td>
-                      {% if item.product and item.product.sellingprice %}
+                      {% if item.final_price %}
+                      <strong>KSh {{ "%.2f"|format(item.final_price) }}</strong>
+                      {% elif item.product and item.product.sellingprice %}
                       <strong>KSh {{ "%.2f"|format(item.product.sellingprice) }}</strong>
                       {% else %}
                       <span class="text-muted">N/A</span>
                       {% endif %}
                     </td>
                     <td>
-                      <span class="badge badge-light fs-6">{{ item.quantity }}</span>
+                      <span class="badge badge-primary fs-6">{{ item.quantity }}</span>
                     </td>
                     <td>
-                      {% if item.product and item.product.sellingprice %}
+                      {% if item.final_price %}
+                      <strong>KSh {{ "%.2f"|format(item.final_price * item.quantity) }}</strong>
+                      {% elif item.product and item.product.sellingprice %}
                       <strong>KSh {{ "%.2f"|format(item.product.sellingprice * item.quantity) }}</strong>
                       {% else %}
                       <span class="text-muted">N/A</span>

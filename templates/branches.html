@@ -71,17 +71,8 @@
                       <span class="badge badge-warning">{{ branch.orders|length }} orders</span>
                     </td>
                     <td>
-                      {% set branch_revenue = 0 %}
-                      {% for order in branch.orders %}
-                        {% if order.payment_status == 'paid' %}
-                          {% for item in order.order_items %}
-                            {% if item.product and item.product.sellingprice %}
-                              {% set branch_revenue = branch_revenue + (item.product.sellingprice * item.quantity) %}
-                            {% endif %}
-                          {% endfor %}
-                        {% endif %}
-                      {% endfor %}
-                      <strong>KSh {{ "%.2f"|format(branch_revenue) }}</strong>
+                      <strong>KSh {{ "%.2f"|format(branch.revenue) }}</strong>
+                      <br><small class="text-muted">Orders: {{ branch.orders|length }}</small>
                     </td>
                     <td>
                       <div class="btn-group" role="group">
@@ -167,79 +158,71 @@
       </div>
     </div>
 
-    <!-- Branch Summary Cards -->
-    <div class="row mt-4">
-      <div class="col-md-3">
-        <div class="card card-round">
-          <div class="card-body text-center">
-            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
-              <i class="fas fa-building"></i>
-            </div>
-            <h4 class="card-title">{{ branches|length }}</h4>
-            <p class="card-category">Total Branches</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card card-round">
-          <div class="card-body text-center">
-            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
-              <i class="fas fa-box"></i>
-            </div>
-            <h4 class="card-title">
-              {% set total_products = 0 %}
-              {% for branch in branches %}
-                {% set total_products = total_products + branch.products|length %}
-              {% endfor %}
-              {{ total_products }}
-            </h4>
-            <p class="card-category">Total Products</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card card-round">
-          <div class="card-body text-center">
-            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
-              <i class="fas fa-shopping-cart"></i>
-            </div>
-            <h4 class="card-title">
-              {% set total_orders = 0 %}
-              {% for branch in branches %}
-                {% set total_orders = total_orders + branch.orders|length %}
-              {% endfor %}
-              {{ total_orders }}
-            </h4>
-            <p class="card-category">Total Orders</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card card-round">
-          <div class="card-body text-center">
-            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
-              <i class="fas fa-money-bill-wave"></i>
-            </div>
-            <h4 class="card-title">
-              {% set total_revenue = 0 %}
-              {% for branch in branches %}
-                {% for order in branch.orders %}
-                  {% if order.payment_status == 'paid' %}
-                    {% for item in order.order_items %}
-                      {% if item.product and item.product.sellingprice %}
-                        {% set total_revenue = total_revenue + (item.product.sellingprice * item.quantity) %}
-                      {% endif %}
-                    {% endfor %}
-                  {% endif %}
-                {% endfor %}
-              {% endfor %}
-              KSh {{ "%.0f"|format(total_revenue) }}
-            </h4>
-            <p class="card-category">Total Revenue</p>
-          </div>
-        </div>
-      </div>
-    </div>
+         <!-- Branch Summary Cards -->
+     <div class="row mt-4">
+       <div class="col-md-3">
+         <div class="card card-round">
+           <div class="card-body text-center">
+             <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+               <i class="fas fa-building"></i>
+             </div>
+             <h4 class="card-title">{{ branches|length }}</h4>
+             <p class="card-category">Total Branches</p>
+           </div>
+         </div>
+       </div>
+       <div class="col-md-3">
+         <div class="card card-round">
+           <div class="card-body text-center">
+             <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+               <i class="fas fa-box"></i>
+             </div>
+             <h4 class="card-title">
+               {% set total_products = 0 %}
+               {% for branch in branches %}
+                 {% set total_products = total_products + branch.products|length %}
+               {% endfor %}
+               {{ total_products }}
+             </h4>
+             <p class="card-category">Total Products</p>
+           </div>
+         </div>
+       </div>
+       <div class="col-md-3">
+         <div class="card card-round">
+           <div class="card-body text-center">
+             <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+               <i class="fas fa-shopping-cart"></i>
+             </div>
+             <h4 class="card-title">
+               {% set total_orders = 0 %}
+               {% for branch in branches %}
+                 {% set total_orders = total_orders + branch.orders|length %}
+               {% endfor %}
+               {{ total_orders }}
+             </h4>
+             <p class="card-category">Total Orders</p>
+           </div>
+         </div>
+       </div>
+       <div class="col-md-3">
+         <div class="card card-round">
+           <div class="card-body text-center">
+             <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+               <i class="fas fa-money-bill-wave"></i>
+             </div>
+             <h4 class="card-title">
+               {% set total_revenue = 0 %}
+               {% for branch in branches %}
+                 {% set total_revenue = total_revenue + (branch.revenue or 0) %}
+               {% endfor %}
+               KSh {{ "%.0f"|format(total_revenue) }}
+             </h4>
+             <p class="card-category">Total Revenue</p>
+           </div>
+         </div>
+       </div>
+     </div>
   </div>
 </div>
 

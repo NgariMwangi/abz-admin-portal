@@ -204,6 +204,14 @@
                   {% endif %}
                 </form>
               </div>
+              
+              <!-- Export Section -->
+              <div class="mt-3 d-flex justify-content-end">
+                <a href="{{ url_for('export_products_csv') }}{% if selected_branch_id %}?branch_id={{ selected_branch_id }}{% endif %}" 
+                   class="btn btn-success btn-sm">
+                  <i class="fas fa-download"></i> Export to CSV
+                </a>
+              </div>
             </div>
             <div class="table-responsive">
               <table class="table table-hover" id="productsTable">

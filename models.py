@@ -14,6 +14,29 @@ class Branch(db.Model):
     image_url = db.Column(db.String, nullable=True)
     products = db.relationship('Product', backref='branch', lazy=True)
     orders = db.relationship('Order', backref='branch', lazy=True)
+    
+    @property
+    def revenue(self):
+        """Calculate total revenue from completed payments for this branch"""
+        from decimal import Decimal
+        total_revenue = Decimal('0.00')
+        
+        try:
+            for order in self.orders:
+                if hasattr(order, 'payments') and order.payments:
+                    for payment in order.payments:
+                        if hasattr(payment, 'payment_status') and payment.payment_status == 'completed':
+                            if hasattr(payment, 'amount') and payment.amount:
+                                try:
+                                    total_revenue += Decimal(str(payment.amount))
+                                except (ValueError, TypeError):
+                                    # Skip invalid amounts
+                                    continue
+        except Exception as e:
+            print(f"Error calculating revenue for branch {self.id}: {e}")
+            return Decimal('0.00')
+        
+        return total_revenue
 
 
 class Category(db.Model):
