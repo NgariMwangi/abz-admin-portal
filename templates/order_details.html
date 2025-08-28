@@ -54,28 +54,28 @@
                     <div class="fw-bold">{{ order.branch.name }}</div>
                   </div>
                 </div>
-                <div class="row mt-2">
-                  <div class="col-6">
-                    <small class="text-muted">Created</small>
-                    <div class="fw-bold">{{ order.created_at.strftime('%b %d, %Y') }}</div>
-                  </div>
-                  <div class="col-6">
-                    <small class="text-muted">Time</small>
-                    <div class="fw-bold">{{ order.created_at.strftime('%I:%M %p') }}</div>
-                  </div>
-                </div>
-                {% if order.approved_at %}
-                <div class="row mt-2">
-                  <div class="col-6">
-                    <small class="text-muted">Approved</small>
-                    <div class="fw-bold">{{ order.approved_at.strftime('%b %d, %Y') }}</div>
-                  </div>
-                  <div class="col-6">
-                    <small class="text-muted">Time</small>
-                    <div class="fw-bold">{{ order.approved_at.strftime('%I:%M %p') }}</div>
-                  </div>
-                </div>
-                {% endif %}
+                                                  <div class="row mt-2">
+                   <div class="col-6">
+                     <small class="text-muted">Created</small>
+                     <div class="fw-bold">{{ order.created_at.strftime('%b %d, %Y') }}</div>
+                   </div>
+                   <div class="col-6">
+                     <small class="text-muted">Time</small>
+                     <div class="fw-bold">{{ order.created_at_adjusted.strftime('%I:%M %p') }}</div>
+                   </div>
+                 </div>
+                 {% if order.approved_at %}
+                 <div class="row mt-2">
+                   <div class="col-6">
+                     <small class="text-muted">Approved</small>
+                     <div class="fw-bold">{{ order.approved_at.strftime('%b %d, %Y') }}</div>
+                   </div>
+                   <div class="col-6">
+                     <small class="text-muted">Time</small>
+                     <div class="fw-bold">{{ order.approved_at_adjusted.strftime('%I:%M %p') }}</div>
+                   </div>
+                 </div>
+                 {% endif %}
               </div>
             </div>
           </div>
@@ -367,12 +367,12 @@
                       <span class="text-muted">N/A</span>
                       {% endif %}
                     </td>
-                    <td>
-                      <div>
-                        <div>{{ payment.created_at.strftime('%b %d, %Y') }}</div>
-                        <small class="text-muted">{{ payment.created_at.strftime('%I:%M %p') }}</small>
-                      </div>
-                    </td>
+                                                              <td>
+                       <div>
+                         <div>{{ payment.created_at.strftime('%b %d, %Y') }}</div>
+                         <small class="text-muted">{{ payment.created_at_adjusted.strftime('%I:%M %p') }}</small>
+                       </div>
+                     </td>
                   </tr>
                   {% endfor %}
                 </tbody>

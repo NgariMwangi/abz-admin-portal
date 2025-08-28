@@ -82,7 +82,7 @@
                   <p><strong>Payment Method:</strong> {{ po.payment_method|title }}</p>
                 {% endif %}
                 <p><strong>Created By:</strong> {{ po.user.firstname }} {{ po.user.lastname if po.user else 'Unknown User' }}</p>
-                <p><strong>Created:</strong> {{ po.created_at.strftime('%B %d, %Y at %I:%M %p') if po.created_at else 'Not set' }}</p>
+                <p><strong>Created:</strong> {{ po.created_at_adjusted.strftime('%B %d, %Y at %I:%M %p') if po.created_at_adjusted else 'Not set' }}</p>
               </div>
             </div>
             {% if po.notes %}
@@ -282,7 +282,7 @@
           </div>
           <div class="card-body">
             <p><strong>Approved By:</strong> {{ po.approver.firstname }} {{ po.approver.lastname }}</p>
-            <p><strong>Approved On:</strong> {{ po.approved_at.strftime('%B %d, %Y at %I:%M %p') if po.approved_at else 'Not set' }}</p>
+                            <p><strong>Approved On:</strong> {{ po.approved_at_adjusted.strftime('%B %d, %Y at %I:%M %p') if po.approved_at_adjusted else 'Not set' }}</p>
           </div>
         </div>
         {% endif %}

@@ -97,7 +97,7 @@
                 
                 <div class="mb-3">
                   <strong>Recorded On:</strong>
-                  <span>{{ expense.created_at.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                  <span>{{ expense.created_at_adjusted.strftime('%B %d, %Y at %I:%M %p') }}</span>
                 </div>
                 
                 {% if expense.approved_by %}
@@ -108,7 +108,7 @@
                   
                   <div class="mb-3">
                     <strong>Approved On:</strong>
-                    <span>{{ expense.updated_at.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                    <span>{{ expense.updated_at_adjusted.strftime('%B %d, %Y at %I:%M %p') }}</span>
                   </div>
                 {% endif %}
                 

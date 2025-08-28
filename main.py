@@ -244,6 +244,11 @@ def index():
             # Store the calculated profit on the order object for template use
             order.calculated_profit = total_profit
         
+        # Add adjusted times (3 hours ahead) for display
+        from datetime import timedelta
+        for order in recent_orders_list:
+            order.created_at_adjusted = order.created_at + timedelta(hours=3)
+        
         recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
     except Exception as e:
         print(f"Error getting recent activities: {e}")
@@ -1108,6 +1113,11 @@ def stock_history(product_id):
     product = Product.query.get_or_404(product_id)
     transactions = StockTransaction.query.filter_by(productid=product_id).order_by(StockTransaction.created_at.desc()).all()
     
+    # Add adjusted times (3 hours ahead) for display
+    from datetime import timedelta
+    for transaction in transactions:
+        transaction.created_at_adjusted = transaction.created_at + timedelta(hours=3)
+    
     return render_template('stock_history.html', product=product, transactions=transactions)
 
 @app.route('/toggle_display/<int:product_id>', methods=['POST'])
@@ -1147,6 +1157,11 @@ def users():
         print(f"Pagination object: {pagination}")
         users = pagination.items
         print(f"Users found: {len(users)}")
+        
+        # Add adjusted times (3 hours ahead) for display
+        from datetime import timedelta
+        for user in users:
+            user.created_at_adjusted = user.created_at + timedelta(hours=3)
         
         return render_template('users.html', users=users, pagination=pagination)
     except Exception as e:
@@ -1420,6 +1435,13 @@ def orders():
             print(f"Error updating payment statuses: {e}")
             db.session.rollback()
         
+        # Add adjusted times (3 hours ahead) for display
+        from datetime import timedelta
+        for order in orders:
+            order.created_at_adjusted = order.created_at + timedelta(hours=3)
+            if order.approved_at:
+                order.approved_at_adjusted = order.approved_at + timedelta(hours=3)
+        
         # Get filter options
         branches = Branch.query.order_by(Branch.name).all()
         
@@ -1485,6 +1507,18 @@ def order_details(order_id):
             except Exception as e:
                 print(f"Error updating payment status: {e}")
                 db.session.rollback()
+        
+        # Add adjusted times (3 hours ahead) for display
+        from datetime import timedelta
+        
+        # Create adjusted time attributes for the order
+        order.created_at_adjusted = order.created_at + timedelta(hours=3)
+        if order.approved_at:
+            order.approved_at_adjusted = order.approved_at + timedelta(hours=3)
+        
+        # Create adjusted time attributes for payments
+        for payment in order.payments:
+            payment.created_at_adjusted = payment.created_at + timedelta(hours=3)
         
         return render_template('order_details.html', order=order, total_amount=total_amount, total_payments=total_payments, payment_status=payment_status, total_profit=total_profit)
     except Exception as e:
@@ -2291,6 +2325,11 @@ def subcategories():
         
         subcategories = pagination.items
         
+        # Add adjusted times (3 hours ahead) for display
+        from datetime import timedelta
+        for subcategory in subcategories:
+            subcategory.created_at_adjusted = subcategory.created_at + timedelta(hours=3)
+        
         return render_template('subcategories.html', subcategories=subcategories, pagination=pagination)
     except Exception as e:
         print(f"Error in subcategories route: {e}")
@@ -2491,6 +2530,11 @@ def product_descriptions(product_id):
         descriptions = ProductDescription.query.filter_by(
             product_id=product_id, is_active=True
         ).order_by(ProductDescription.sort_order, ProductDescription.created_at).all()
+        
+        # Add adjusted times (3 hours ahead) for display
+        from datetime import timedelta
+        for description in descriptions:
+            description.created_at_adjusted = description.created_at + timedelta(hours=3)
         
         return render_template('product_descriptions.html', 
                              product=product, 
@@ -2727,6 +2771,11 @@ def edit_expense(id):
             db.session.rollback()
             flash(f'Error updating expense: {str(e)}', 'danger')
     
+    # Add adjusted times (3 hours ahead) for display
+    from datetime import timedelta
+    expense.created_at_adjusted = expense.created_at + timedelta(hours=3)
+    expense.updated_at_adjusted = expense.updated_at + timedelta(hours=3)
+    
     return render_template('edit_expense.html', expense=expense)
 
 
@@ -2801,6 +2850,12 @@ def delete_expense(id):
 @role_required(['admin'])
 def expense_details(id):
     expense = Expense.query.get_or_404(id)
+    
+    # Add adjusted times (3 hours ahead) for display
+    from datetime import timedelta
+    expense.created_at_adjusted = expense.created_at + timedelta(hours=3)
+    expense.updated_at_adjusted = expense.updated_at + timedelta(hours=3)
+    
     return render_template('expense_details.html', expense=expense)
 
 # Supplier Management Routes
@@ -3536,11 +3591,13 @@ def purchase_order_details(po_id):
             flash(f'Purchase Order with ID {po_id} not found', 'error')
             return redirect(url_for('purchase_orders'))
         
+        # Add adjusted times (3 hours ahead) for display
+        from datetime import timedelta
+        if po.created_at:
+            po.created_at_adjusted = po.created_at + timedelta(hours=3)
+        if po.approved_at:
+            po.approved_at_adjusted = po.approved_at + timedelta(hours=3)
         
-        
-      
-        
-     
         return render_template('purchase_order_details.html', po=po)
         
     except Exception as e:

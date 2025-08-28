@@ -172,10 +172,10 @@
               {% endif %}
             </p>
             <p><strong>Recorded By:</strong> {{ expense.user.firstname }} {{ expense.user.lastname }}</p>
-            <p><strong>Recorded On:</strong> {{ expense.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            <p><strong>Recorded On:</strong> {{ expense.created_at_adjusted.strftime('%Y-%m-%d %H:%M') }}</p>
             {% if expense.approved_by %}
               <p><strong>Approved By:</strong> {{ expense.approver.firstname }} {{ expense.approver.lastname }}</p>
-              <p><strong>Approved On:</strong> {{ expense.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+              <p><strong>Approved On:</strong> {{ expense.updated_at_adjusted.strftime('%Y-%m-%d %H:%M') }}</p>
             {% endif %}
             {% if expense.approval_notes %}
               <p><strong>Notes:</strong> {{ expense.approval_notes }}</p>

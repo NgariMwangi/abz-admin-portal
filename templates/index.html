@@ -549,7 +549,7 @@
                           <span class="badge bg-warning">Pending</span>
                         {% endif %}
                       </td>
-                      <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                      <td>{{ order.created_at_adjusted.strftime('%Y-%m-%d %H:%M') }}</td>
                     </tr>
                     {% endfor %}
                   </tbody>

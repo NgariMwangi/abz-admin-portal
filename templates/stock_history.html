@@ -78,7 +78,7 @@
                 <tbody>
                   {% for transaction in transactions %}
                   <tr>
-                    <td>{{ transaction.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>{{ transaction.created_at_adjusted.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                     <td>
                       {% if transaction.transaction_type == 'add' %}
                         <span class="badge bg-success">Add</span>
