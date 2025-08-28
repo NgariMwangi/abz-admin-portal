@@ -223,6 +223,26 @@ def index():
             
             # Store the calculated total on the order object for template use
             order.calculated_total = total_amount
+            
+            # Calculate profit for the order
+            total_profit = 0
+            for item in order.order_items:
+                if item.final_price:
+                    # For items with final_price, calculate profit if we have buying price
+                    if item.product and item.product.buyingprice:
+                        item_profit = (item.final_price - item.product.buyingprice) * item.quantity
+                        total_profit += item_profit
+                    elif hasattr(item, 'original_price') and hasattr(item, 'buying_price') and item.buying_price:
+                        # For manually entered items with buying price
+                        item_profit = (item.original_price - item.buying_price) * item.quantity
+                        total_profit += item_profit
+                elif item.product and item.product.sellingprice and item.product.buyingprice:
+                    # For items using product selling price, calculate profit
+                    item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
+                    total_profit += item_profit
+            
+            # Store the calculated profit on the order object for template use
+            order.calculated_profit = total_profit
         
         recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
     except Exception as e:
@@ -1355,6 +1375,26 @@ def orders():
             # Store the calculated total on the order object for template use
             order.calculated_total = total_amount
             
+            # Calculate profit for the order
+            total_profit = 0
+            for item in order.order_items:
+                if item.final_price:
+                    # For items with final_price, calculate profit if we have buying price
+                    if item.product and item.product.buyingprice:
+                        item_profit = (item.final_price - item.product.buyingprice) * item.quantity
+                        total_profit += item_profit
+                    elif hasattr(item, 'original_price') and hasattr(item, 'buying_price') and item.buying_price:
+                        # For manually entered items with buying price
+                        item_profit = (item.original_price - item.buying_price) * item.quantity
+                        total_profit += item_profit
+                elif item.product and item.product.sellingprice and item.product.buyingprice:
+                    # For items using product selling price, calculate profit
+                    item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
+                    total_profit += item_profit
+            
+            # Store the calculated profit on the order object for template use
+            order.calculated_profit = total_profit
+            
             # Calculate total payments received
             total_payments = Decimal('0')
             for payment in order.payments:
@@ -1403,13 +1443,25 @@ def order_details(order_id):
     try:
         order = Order.query.get_or_404(order_id)
         
-        # Calculate order total
+        # Calculate order total and profit
         total_amount = 0
+        total_profit = 0
         for item in order.order_items:
             if item.final_price:
                 total_amount += item.final_price * item.quantity
+                # Calculate profit for items with final_price
+                if item.product and item.product.buyingprice:
+                    item_profit = (item.final_price - item.product.buyingprice) * item.quantity
+                    total_profit += item_profit
+                elif hasattr(item, 'buying_price') and item.buying_price:
+                    item_profit = (item.final_price - item.buying_price) * item.quantity
+                    total_profit += item_profit
             elif item.product and item.product.sellingprice:
                 total_amount += item.product.sellingprice * item.quantity
+                # Calculate profit for items using product selling price
+                if item.product.buyingprice:
+                    item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
+                    total_profit += item_profit
         
         # Calculate payment status based on actual payments received
         total_payments = Decimal('0')
@@ -1434,7 +1486,7 @@ def order_details(order_id):
                 print(f"Error updating payment status: {e}")
                 db.session.rollback()
         
-        return render_template('order_details.html', order=order, total_amount=total_amount, total_payments=total_payments, payment_status=payment_status)
+        return render_template('order_details.html', order=order, total_amount=total_amount, total_payments=total_payments, payment_status=payment_status, total_profit=total_profit)
     except Exception as e:
         print(f"Error in order details route: {e}")
         flash('An error occurred while loading order details.', 'error')

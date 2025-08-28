@@ -507,6 +507,7 @@
                       <th>Customer</th>
                       <th>Branch</th>
                       <th>Amount</th>
+                      <th>Profit</th>
                       <th>Status</th>
                       <th>Date</th>
                     </tr>
@@ -530,6 +531,13 @@
                       <td>
                         {% if order.calculated_total %}
                           KSh {{ "{:,.0f}".format(order.calculated_total) }}
+                        {% else %}
+                          <span class="text-muted">N/A</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if order.calculated_profit %}
+                          <span class="text-success">KSh {{ "{:,.0f}".format(order.calculated_profit) }}</span>
                         {% else %}
                           <span class="text-muted">N/A</span>
                         {% endif %}

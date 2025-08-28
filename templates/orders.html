@@ -87,6 +87,7 @@
                     <th>Branch</th>
                    
                     <th>Total</th>
+                    <th>Profit</th>
                     <th>Status</th>
                     <th>Payment</th>
                     <th>Date</th>
@@ -119,6 +120,13 @@
                   
                     <td>
                       <strong>KSh {{ "%.2f"|format(order.calculated_total) }}</strong>
+                    </td>
+                    <td>
+                      {% if order.calculated_profit %}
+                        <strong class="text-success">KSh {{ "%.2f"|format(order.calculated_profit) }}</strong>
+                      {% else %}
+                        <span class="text-muted">N/A</span>
+                      {% endif %}
                     </td>
                     <td>
                       {% if order.approvalstatus %}
