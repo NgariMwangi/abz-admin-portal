@@ -1,0 +1,34 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="page-inner">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-danger bubble-shadow-small mb-3">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 class="card-title text-danger">Access Denied</h3>
+            <p class="card-text">
+              You do not have permission to access the requested page.
+            </p>
+            <p class="card-text">
+              <strong>Your Role:</strong> {{ current_user.role|title if current_user.role else 'Not assigned' }}
+            </p>
+            <div class="mt-4">
+              <a href="{{ url_for('index') }}" class="btn btn-primary btn-round">
+                <i class="fas fa-home"></i> Go to Dashboard
+              </a>
+              <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-round ms-2">
+                <i class="fas fa-sign-out-alt"></i> Logout
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

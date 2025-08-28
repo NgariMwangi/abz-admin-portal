@@ -98,6 +98,26 @@
                 </small>
               </div>
 
+              <!-- Purchase Order Items Section -->
+              <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h5 class="mb-0">Purchase Order Items</h5>
+                  <button type="button" class="btn btn-success btn-sm" onclick="addItemRow()">
+                    <i class="fas fa-plus"></i> Add Item
+                  </button>
+                </div>
+                
+                <div id="items-container">
+                  <!-- Items will be added here dynamically -->
+                </div>
+                
+                <div class="text-center mt-3">
+                  <button type="button" class="btn btn-outline-primary btn-sm" onclick="addItemRow()">
+                    <i class="fas fa-plus"></i> Add Another Item
+                  </button>
+                </div>
+              </div>
+
               <div class="mb-3">
                 <button type="submit" class="btn btn-primary btn-round">
                   <i class="fas fa-save"></i> Create Purchase Order
@@ -144,15 +164,41 @@
 
         <div class="card card-round mt-3">
           <div class="card-header">
+            <h4 class="card-title">Adding Items</h4>
+          </div>
+          <div class="card-body">
+            <ul class="list-unstyled">
+              <li class="mb-2">
+                <i class="fas fa-plus text-success"></i>
+                <strong>Manual Entry:</strong> Type product code, name, quantity, and notes
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-database text-info"></i>
+                <strong>From Database:</strong> Select existing products to auto-fill details
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-edit text-warning"></i>
+                <strong>Edit Later:</strong> Items can be modified after creation
+              </li>
+              <li class="mb-2">
+                <i class="fas fa-trash text-danger"></i>
+                <strong>Remove Items:</strong> Use the delete button to remove unwanted items
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card card-round mt-3">
+          <div class="card-header">
             <h4 class="card-title">Next Steps</h4>
           </div>
           <div class="card-body">
             <ol class="list-unstyled">
               <li class="mb-2">
-                <strong>1.</strong> Create the purchase order
+                <strong>1.</strong> Create the purchase order with items
               </li>
               <li class="mb-2">
-                <strong>2.</strong> Add items to the order
+                <strong>2.</strong> Review and edit items if needed
               </li>
               <li class="mb-2">
                 <strong>3.</strong> Submit for approval
@@ -176,6 +222,166 @@
 document.addEventListener('DOMContentLoaded', function() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('order_date').value = today;
+    
+    // Add initial item row
+    addItemRow();
+});
+
+let itemCounter = 0;
+
+function addItemRow() {
+    itemCounter++;
+    const container = document.getElementById('items-container');
+    
+    const itemRow = document.createElement('div');
+    itemRow.className = 'item-row border rounded p-3 mb-3';
+    itemRow.id = `item-${itemCounter}`;
+    
+    itemRow.innerHTML = `
+        <div class="row">
+            <div class="col-md-3">
+                <div class="mb-2">
+                    <label class="form-label small">Product Code *</label>
+                    <input type="text" class="form-control form-control-sm" 
+                           name="product_code_${itemCounter}" 
+                           placeholder="e.g., PROD001" required>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mb-2">
+                    <label class="form-label small">Product Name *</label>
+                    <input type="text" class="form-control form-control-sm" 
+                           name="product_name_${itemCounter}" 
+                           placeholder="Product name" required>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-2">
+                    <label class="form-label small">Quantity *</label>
+                    <input type="number" class="form-control form-control-sm" 
+                           name="quantity_${itemCounter}" 
+                           min="1" value="1" required>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-2">
+                    <label class="form-label small">Notes</label>
+                    <input type="text" class="form-control form-control-sm" 
+                           name="notes_${itemCounter}" 
+                           placeholder="Optional notes">
+                </div>
+            </div>
+            <div class="col-md-1">
+                <div class="mb-2">
+                    <label class="form-label small">&nbsp;</label>
+                    <button type="button" class="btn btn-danger btn-sm w-100" 
+                            onclick="removeItemRow(${itemCounter})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Product Selection from Database -->
+        <div class="row mt-2">
+            <div class="col-12">
+                <div class="mb-2">
+                    <label class="form-label small">Or Select from Existing Products</label>
+                    <select class="form-control form-control-sm" 
+                            onchange="fillProductDetails(this, ${itemCounter})">
+                        <option value="">-- Select Product --</option>
+                        {% for product in products %}
+                            <option value="{{ product.id }}" 
+                                    data-code="{{ product.productcode or '' }}" 
+                                    data-name="{{ product.name }}">
+                                {{ product.name }} ({{ product.productcode or 'No Code' }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Hidden input for form submission -->
+        <input type="hidden" name="items_data" 
+               value="" id="item_data_${itemCounter}">
+    `;
+    
+    container.appendChild(itemRow);
+    updateItemData(itemCounter);
+}
+
+function removeItemRow(itemId) {
+    const itemRow = document.getElementById(`item-${itemId}`);
+    if (itemRow) {
+        itemRow.remove();
+    }
+}
+
+function fillProductDetails(selectElement, itemId) {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    if (selectedOption.value) {
+        const productCode = selectedOption.getAttribute('data-code') || '';
+        const productName = selectedOption.getAttribute('data-name') || '';
+        
+        const itemRow = document.getElementById(`item-${itemId}`);
+        itemRow.querySelector(`input[name="product_code_${itemId}"]`).value = productCode;
+        itemRow.querySelector(`input[name="product_name_${itemId}"]`).value = productName;
+        
+        updateItemData(itemId);
+    }
+}
+
+function updateItemData(itemId) {
+    const itemRow = document.getElementById(`item-${itemId}`);
+    if (itemRow) {
+        const productCode = itemRow.querySelector(`input[name="product_code_${itemId}"]`).value;
+        const productName = itemRow.querySelector(`input[name="product_name_${itemId}"]`).value;
+        const quantity = itemRow.querySelector(`input[name="quantity_${itemId}"]`).value;
+        const notes = itemRow.querySelector(`input[name="notes_${itemId}"]`).value;
+        
+        const itemData = `${productCode}|${productName}|${quantity}|${notes}`;
+        itemRow.querySelector(`input[name="items_data"]`).value = itemData;
+    }
+}
+
+// Update item data when inputs change
+document.addEventListener('input', function(e) {
+    if (e.target.name && (e.target.name.startsWith('product_code_') || 
+                          e.target.name.startsWith('product_name_') || 
+                          e.target.name.startsWith('quantity_') || 
+                          e.target.name.startsWith('notes_'))) {
+        const itemId = e.target.name.split('_').pop();
+        updateItemData(itemId);
+    }
+});
+
+// Form validation before submission
+document.querySelector('form').addEventListener('submit', function(e) {
+    const itemRows = document.querySelectorAll('.item-row');
+    let hasValidItems = false;
+    
+    itemRows.forEach(row => {
+        const productCode = row.querySelector('input[name^="product_code_"]').value.trim();
+        const productName = row.querySelector('input[name^="product_name_"]').value.trim();
+        const quantity = row.querySelector('input[name^="quantity_"]').value.trim();
+        
+        if (productCode && productName && quantity) {
+            hasValidItems = true;
+        }
+    });
+    
+    if (!hasValidItems) {
+        e.preventDefault();
+        alert('Please add at least one valid item to the purchase order.');
+        return false;
+    }
+    
+    // Update all item data before submission
+    itemRows.forEach(row => {
+        const itemId = row.id.split('-')[1];
+        updateItemData(itemId);
+    });
 });
 </script>
 {% endblock %} 

@@ -28,6 +28,12 @@ from extensions import db
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Add session debugging
+print(f"🔍 Session configuration:")
+print(f"   - SECRET_KEY set: {'Yes' if app.config.get('SECRET_KEY') else 'No'}")
+print(f"   - SESSION_COOKIE_SECURE: {app.config.get('SESSION_COOKIE_SECURE', 'Not set')}")
+print(f"   - SESSION_COOKIE_HTTPONLY: {app.config.get('SESSION_COOKIE_HTTPONLY', 'Not set')}")
+
 # Cloudinary Configuration
 cloudinary.config(
     cloud_name = app.config['CLOUDINARY_CLOUD_NAME'],
@@ -41,7 +47,7 @@ db.init_app(app)
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login_post'
+login_manager.login_view = 'login'
 
 # Import models after db is initialized
 from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription, Expense, Supplier, PurchaseOrder, PurchaseOrderItem
@@ -66,7 +72,8 @@ def role_required(roles):
                 return redirect(url_for('login', next=request.url))
             if not hasattr(current_user, 'role') or current_user.role not in roles:
                 flash('You do not have permission to access this page.', 'danger')
-                return redirect(url_for('login'))
+                # Redirect to a safe page instead of index to avoid potential loops
+                return redirect(url_for('unauthorized'))
             return f(*args, **kwargs)
         return decorated_function
     return wrapper
@@ -75,19 +82,25 @@ def role_required(roles):
 @login_required
 @role_required(['admin']) 
 def index():
+    print(f"🔍 Index route accessed - User: {current_user.email if current_user.is_authenticated else 'Not authenticated'}")
+    print(f"🔍 User role: {current_user.role if current_user.is_authenticated else 'No role'}")
+    
+    # Set default date values
+    today = datetime.now().date()
+    this_month = datetime.now().replace(day=1).date()
+    last_month = (this_month - timedelta(days=1)).replace(day=1)
+    
     try:
-        # Get real business data
-       
-        
-        # Current date in EAT timezone
+        # Get real business data in EAT timezone
         now = datetime.now(EAT)
         today = now.date()
-        this_month = now.replace(day=1)
+        this_month = now.replace(day=1).date()
         last_month = (this_month - timedelta(days=1)).replace(day=1)
+        print(f"✅ EAT timezone calculation successful")
     except Exception as e:
-        print(f"Error in index route setup: {e}")
+        print(f"❌ Error in index route setup: {e}")
         flash('An error occurred while loading dashboard data. Please try again.', 'error')
-        return redirect(url_for('login'))
+        # Continue with default date values
     
     # Dashboard statistics
     try:
@@ -245,7 +258,6 @@ def index():
             order.calculated_profit = total_profit
         
         # Add adjusted times (3 hours ahead) for display
-        from datetime import timedelta
         for order in recent_orders_list:
             order.created_at_adjusted = order.created_at + timedelta(hours=3)
         
@@ -368,7 +380,9 @@ def index():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    print(f"🔍 Login route accessed - User authenticated: {current_user.is_authenticated}")
     if current_user.is_authenticated:
+        print(f"🔍 User already authenticated, redirecting to index")
         return redirect(url_for('index'))
         
     if request.method == "POST":
@@ -459,6 +473,21 @@ def logout():
     logout_user()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('login'))
+
+@app.route('/test_auth')
+@login_required
+def test_auth():
+    return jsonify({
+        'authenticated': current_user.is_authenticated,
+        'user_id': current_user.id if current_user.is_authenticated else None,
+        'email': current_user.email if current_user.is_authenticated else None,
+        'role': current_user.role if current_user.is_authenticated else None
+    })
+
+@app.route('/unauthorized')
+@login_required
+def unauthorized():
+    return render_template('unauthorized.html')
 
 # Example of a protected route
 @app.route("/dashboard")
@@ -1114,7 +1143,6 @@ def stock_history(product_id):
     transactions = StockTransaction.query.filter_by(productid=product_id).order_by(StockTransaction.created_at.desc()).all()
     
     # Add adjusted times (3 hours ahead) for display
-    from datetime import timedelta
     for transaction in transactions:
         transaction.created_at_adjusted = transaction.created_at + timedelta(hours=3)
     
@@ -1159,7 +1187,6 @@ def users():
         print(f"Users found: {len(users)}")
         
         # Add adjusted times (3 hours ahead) for display
-        from datetime import timedelta
         for user in users:
             user.created_at_adjusted = user.created_at + timedelta(hours=3)
         
@@ -1436,7 +1463,6 @@ def orders():
             db.session.rollback()
         
         # Add adjusted times (3 hours ahead) for display
-        from datetime import timedelta
         for order in orders:
             order.created_at_adjusted = order.created_at + timedelta(hours=3)
             if order.approved_at:
@@ -1509,7 +1535,6 @@ def order_details(order_id):
                 db.session.rollback()
         
         # Add adjusted times (3 hours ahead) for display
-        from datetime import timedelta
         
         # Create adjusted time attributes for the order
         order.created_at_adjusted = order.created_at + timedelta(hours=3)
@@ -2326,7 +2351,6 @@ def subcategories():
         subcategories = pagination.items
         
         # Add adjusted times (3 hours ahead) for display
-        from datetime import timedelta
         for subcategory in subcategories:
             subcategory.created_at_adjusted = subcategory.created_at + timedelta(hours=3)
         
@@ -2532,7 +2556,6 @@ def product_descriptions(product_id):
         ).order_by(ProductDescription.sort_order, ProductDescription.created_at).all()
         
         # Add adjusted times (3 hours ahead) for display
-        from datetime import timedelta
         for description in descriptions:
             description.created_at_adjusted = description.created_at + timedelta(hours=3)
         
@@ -2772,7 +2795,6 @@ def edit_expense(id):
             flash(f'Error updating expense: {str(e)}', 'danger')
     
     # Add adjusted times (3 hours ahead) for display
-    from datetime import timedelta
     expense.created_at_adjusted = expense.created_at + timedelta(hours=3)
     expense.updated_at_adjusted = expense.updated_at + timedelta(hours=3)
     
@@ -2852,7 +2874,6 @@ def expense_details(id):
     expense = Expense.query.get_or_404(id)
     
     # Add adjusted times (3 hours ahead) for display
-    from datetime import timedelta
     expense.created_at_adjusted = expense.created_at + timedelta(hours=3)
     expense.updated_at_adjusted = expense.updated_at + timedelta(hours=3)
     
@@ -3132,7 +3153,31 @@ def add_purchase_order():
             db.session.add(new_po)
             db.session.commit()
             
-            flash('Purchase Order created successfully', 'success')
+            # Process purchase order items
+            items_data = request.form.getlist('items_data')
+            if items_data:
+                for item_data in items_data:
+                    if item_data.strip():
+                        # Parse item data (format: product_code|product_name|quantity|notes)
+                        parts = item_data.split('|')
+                        if len(parts) >= 3:
+                            product_code = parts[0].strip()
+                            product_name = parts[1].strip() if len(parts) > 1 else ''
+                            quantity = int(parts[2].strip()) if parts[2].strip().isdigit() else 1
+                            notes = parts[3].strip() if len(parts) > 3 else ''
+                            
+                            po_item = PurchaseOrderItem(
+                                purchase_order_id=new_po.id,
+                                product_code=product_code,
+                                product_name=product_name,
+                                quantity=quantity,
+                                notes=notes
+                            )
+                            db.session.add(po_item)
+                
+                db.session.commit()
+            
+            flash('Purchase Order created successfully with items', 'success')
             return redirect(url_for('edit_purchase_order', id=new_po.id))
         except Exception as e:
             db.session.rollback()
@@ -3142,7 +3187,7 @@ def add_purchase_order():
     
     suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
     branches = Branch.query.all()
-    products = Product.query.all()
+    products = Product.query.filter_by(display=True).order_by(Product.name).all()
     
     return render_template('add_purchase_order.html', 
                          suppliers=suppliers, 
@@ -3592,7 +3637,6 @@ def purchase_order_details(po_id):
             return redirect(url_for('purchase_orders'))
         
         # Add adjusted times (3 hours ahead) for display
-        from datetime import timedelta
         if po.created_at:
             po.created_at_adjusted = po.created_at + timedelta(hours=3)
         if po.approved_at:
@@ -3816,6 +3860,81 @@ def export_purchase_order_pdf(po_id):
         print(f"Error generating PDF: {e}")
         flash('An error occurred while generating the PDF.', 'error')
         return redirect(url_for('purchase_orders'))
+
+@app.route('/add_purchase_order_item/<int:po_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def add_purchase_order_item(po_id):
+    try:
+        po = PurchaseOrder.query.get_or_404(po_id)
+        
+        # Check if PO is in editable state
+        if po.status not in ['draft', 'submitted']:
+            flash('Cannot add items to a purchase order that is not in draft or submitted status', 'error')
+            return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        product_code = request.form.get('product_code')
+        product_name = request.form.get('product_name')
+        quantity = request.form.get('quantity')
+        notes = request.form.get('notes', '')
+        
+        if not product_code or not product_name or not quantity:
+            flash('Product code, name, and quantity are required', 'error')
+            return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                raise ValueError("Quantity must be positive")
+        except ValueError:
+            flash('Quantity must be a positive number', 'error')
+            return redirect(url_for('edit_purchase_order', id=po_id))
+        
+        # Create new purchase order item
+        po_item = PurchaseOrderItem(
+            purchase_order_id=po.id,
+            product_code=product_code,
+            product_name=product_name,
+            quantity=quantity,
+            notes=notes
+        )
+        
+        db.session.add(po_item)
+        db.session.commit()
+        
+        flash('Item added successfully to purchase order', 'success')
+        return redirect(url_for('edit_purchase_order', id=po_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error adding item to purchase order: {e}")
+        flash('An error occurred while adding item to purchase order', 'error')
+        return redirect(url_for('edit_purchase_order', id=po_id))
+
+@app.route('/delete_purchase_order_item/<int:item_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_purchase_order_item(item_id):
+    try:
+        po_item = PurchaseOrderItem.query.get_or_404(item_id)
+        po = po_item.purchase_order
+        
+        # Check if PO is in editable state
+        if po.status not in ['draft', 'submitted']:
+            flash('Cannot delete items from a purchase order that is not in draft or submitted status', 'error')
+            return redirect(url_for('edit_purchase_order', id=po.id))
+        
+        db.session.delete(po_item)
+        db.session.commit()
+        
+        flash('Item removed successfully from purchase order', 'success')
+        return redirect(url_for('edit_purchase_order', id=po.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting purchase order item: {e}")
+        flash('An error occurred while deleting item from purchase order', 'error')
+        return redirect(url_for('edit_purchase_order', id=po.id))
 
 # Error handlers
 @app.errorhandler(IntegrityError)
