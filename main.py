@@ -484,6 +484,40 @@ def test_auth():
         'role': current_user.role if current_user.is_authenticated else None
     })
 
+@app.route('/debug_order/<int:order_id>')
+@login_required
+@role_required(['admin'])
+def debug_order(order_id):
+    try:
+        order = Order.query.get_or_404(order_id)
+        debug_data = {
+            'order_id': order.id,
+            'order_number': order.ordernumber,
+            'total_items': len(order.order_items),
+            'items': []
+        }
+        
+        for item in order.order_items:
+            item_data = {
+                'item_id': item.id,
+                'product_id': item.productid,
+                'product_name': item.product_name if hasattr(item, 'product_name') else None,
+                'final_price': float(item.final_price) if item.final_price else None,
+                'quantity': item.quantity,
+                'has_product': item.product is not None,
+                'product_buying_price': float(item.product.buyingprice) if item.product and item.product.buyingprice else None,
+                'product_selling_price': float(item.product.sellingprice) if item.product and item.product.sellingprice else None,
+                'has_buying_price': hasattr(item, 'buying_price') and item.buying_price is not None,
+                'buying_price': float(item.buying_price) if hasattr(item, 'buying_price') and item.buying_price else None,
+                'has_original_price': hasattr(item, 'original_price') and item.original_price is not None,
+                'original_price': float(item.original_price) if hasattr(item, 'original_price') and item.original_price else None
+            }
+            debug_data['items'].append(item_data)
+        
+        return jsonify(debug_data)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @app.route('/unauthorized')
 @login_required
 def unauthorized():
@@ -1419,23 +1453,40 @@ def orders():
             
             # Calculate profit for the order
             total_profit = 0
+            print(f"🔍 Calculating profit for order {order.id} with {len(order.order_items)} items")
             for item in order.order_items:
+                print(f"  📦 Item {item.id}: final_price={item.final_price}, product_id={item.productid}")
+                
                 if item.final_price:
+                    print(f"    ✅ Has final_price: {item.final_price}")
                     # For items with final_price, calculate profit if we have buying price
                     if item.product and item.product.buyingprice:
                         item_profit = (item.final_price - item.product.buyingprice) * item.quantity
                         total_profit += item_profit
-                    elif hasattr(item, 'original_price') and hasattr(item, 'buying_price') and item.buying_price:
-                        # For manually entered items with buying price
-                        item_profit = (item.original_price - item.buying_price) * item.quantity
+                        print(f"      💰 Product profit: ({item.final_price} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
+                    elif hasattr(item, 'buying_price') and item.buying_price:
+                        item_profit = (item.final_price - item.buying_price) * item.quantity
                         total_profit += item_profit
+                        print(f"      💰 Manual item profit: ({item.final_price} - {item.buying_price}) × {item.quantity} = {item_profit}")
+                    else:
+                        print(f"      ⚠️ No buying price available for item with final_price")
                 elif item.product and item.product.sellingprice and item.product.buyingprice:
                     # For items using product selling price, calculate profit
                     item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
                     total_profit += item_profit
+                    print(f"    📊 Product prices profit: ({item.product.sellingprice} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
+                else:
+                    print(f"    ⚠️ Cannot calculate profit - missing price data")
+                    if item.product:
+                        print(f"      Product: buyingprice={item.product.buyingprice}, sellingprice={item.product.sellingprice}")
+                    if hasattr(item, 'buying_price'):
+                        print(f"      Item buying_price: {item.buying_price}")
+                    if hasattr(item, 'original_price'):
+                        print(f"      Item original_price: {item.original_price}")
             
             # Store the calculated profit on the order object for template use
             order.calculated_profit = total_profit
+            print(f"🔍 Order {order.id}: calculated_profit = {total_profit}")
             
             # Calculate total payments received
             total_payments = Decimal('0')
