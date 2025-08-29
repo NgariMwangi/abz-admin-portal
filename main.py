@@ -239,23 +239,40 @@ def index():
             
             # Calculate profit for the order
             total_profit = 0
+            print(f"🔍 Dashboard: Calculating profit for order {order.id} with {len(order.order_items)} items")
             for item in order.order_items:
+                print(f"  📦 Dashboard Item {item.id}: final_price={item.final_price}, product_id={item.productid}")
+                
                 if item.final_price:
+                    print(f"    ✅ Has final_price: {item.final_price}")
                     # For items with final_price, calculate profit if we have buying price
                     if item.product and item.product.buyingprice:
                         item_profit = (item.final_price - item.product.buyingprice) * item.quantity
                         total_profit += item_profit
-                    elif hasattr(item, 'original_price') and hasattr(item, 'buying_price') and item.buying_price:
-                        # For manually entered items with buying price
-                        item_profit = (item.original_price - item.buying_price) * item.quantity
+                        print(f"      💰 Product profit: ({item.final_price} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
+                    elif hasattr(item, 'buying_price') and item.buying_price:
+                        item_profit = (item.final_price - item.buying_price) * item.quantity
                         total_profit += item_profit
+                        print(f"      💰 Manual item profit: ({item.final_price} - {item.buying_price}) × {item.quantity} = {item_profit}")
+                    else:
+                        print(f"      ⚠️ No buying price available for item with final_price")
                 elif item.product and item.product.sellingprice and item.product.buyingprice:
                     # For items using product selling price, calculate profit
                     item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
                     total_profit += item_profit
+                    print(f"    📊 Product prices profit: ({item.product.sellingprice} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
+                else:
+                    print(f"    ⚠️ Cannot calculate profit - missing price data")
+                    if item.product:
+                        print(f"      Product: buyingprice={item.product.buyingprice}, sellingprice={item.product.sellingprice}")
+                    if hasattr(item, 'buying_price'):
+                        print(f"      Item buying_price: {item.buying_price}")
+                    if hasattr(item, 'original_price'):
+                        print(f"      Item original_price: {item.original_price}")
             
             # Store the calculated profit on the order object for template use
             order.calculated_profit = total_profit
+            print(f"🔍 Dashboard: Order {order.id}: calculated_profit = {total_profit}")
         
         # Add adjusted times (3 hours ahead) for display
         for order in recent_orders_list:
