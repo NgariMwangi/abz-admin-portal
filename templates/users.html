@@ -36,6 +36,7 @@
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
+                    <th>Branch Access</th>
                     <th>Created</th>
                     <th>Actions</th>
                   </tr>
@@ -81,6 +82,27 @@
                       {% endif %}
                     </td>
                     <td>
+                      {% if user.has_all_branch_access() %}
+                        <span class="badge badge-success">
+                          <i class="fas fa-globe"></i> All Branches
+                        </span>
+                      {% elif user.accessible_branch_ids and user.accessible_branch_ids|length > 0 %}
+                        <span class="badge badge-info">
+                          <i class="fas fa-building"></i> {{ user.accessible_branch_ids|length }} Branch{{ 'es' if user.accessible_branch_ids|length > 1 else '' }}
+                        </span>
+                        <br>
+                        <small class="text-muted">
+                          {% for branch in user.get_accessible_branches() %}
+                            {{ branch.name }}{% if not loop.last %}, {% endif %}
+                          {% endfor %}
+                        </small>
+                      {% else %}
+                        <span class="badge badge-secondary">
+                          <i class="fas fa-ban"></i> No Access
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td>
                       <div>
                         <div>{{ user.created_at.strftime('%b %d, %Y') }}</div>
                         <small class="text-muted">{{ user.created_at_adjusted.strftime('%I:%M %p') }}</small>
@@ -93,7 +115,7 @@
                         </a>
                         {% if user.id != current_user.id %}
                         <button type="button" class="btn btn-sm btn-outline-danger" 
-                                onclick="confirmDelete({{ user.id }}, '{{ user.firstname }} {{ user.lastname }}')" 
+                                onclick="confirmDelete({{ user.id }}, '{{ user.firstname|e }} {{ user.lastname|e }}')" 
                                 title="Delete User">
                           <i class="fas fa-trash"></i>
                         </button>

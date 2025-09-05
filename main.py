@@ -1259,6 +1259,8 @@ def add_user():
         lastname = request.form.get('lastname')
         password = request.form.get('password')
         role = request.form.get('role')
+        access_all_branches = request.form.get('access_all_branches')
+        selected_branches = request.form.getlist('selected_branches')
         
         # Basic validation
         if not email or not firstname or not lastname or not password or not role:
@@ -1281,6 +1283,17 @@ def add_user():
         )
         new_user.set_password(password)  # Hash the password securely
         
+        # Handle branch access
+        if access_all_branches == 'on':
+            new_user.set_all_branch_access()
+        else:
+            if selected_branches:
+                # Convert string IDs to integers
+                branch_ids = [int(bid) for bid in selected_branches if bid.isdigit()]
+                new_user.accessible_branch_ids = branch_ids
+            else:
+                new_user.clear_branch_access()
+        
         try:
             db.session.add(new_user)
             db.session.commit()
@@ -1291,7 +1304,9 @@ def add_user():
             flash('An error occurred while adding the user. Please try again.', 'error')
             return redirect(url_for('add_user'))
     
-    return render_template('add_user.html')
+    # Get all branches for the form
+    branches = Branch.query.order_by(Branch.name).all()
+    return render_template('add_user.html', branches=branches)
 
 @app.route('/edit_user/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -1306,6 +1321,8 @@ def edit_user(id):
         lastname = request.form.get('lastname')
         password = request.form.get('password')
         role = request.form.get('role')
+        access_all_branches = request.form.get('access_all_branches')
+        selected_branches = request.form.getlist('selected_branches')
         
         # Basic validation
         if not email or not firstname or not lastname or not role:
@@ -1328,6 +1345,17 @@ def edit_user(id):
         if password:
             user.set_password(password)  # Hash the password securely
         
+        # Handle branch access
+        if access_all_branches == 'on':
+            user.set_all_branch_access()
+        else:
+            if selected_branches:
+                # Convert string IDs to integers
+                branch_ids = [int(bid) for bid in selected_branches if bid.isdigit()]
+                user.accessible_branch_ids = branch_ids
+            else:
+                user.clear_branch_access()
+        
         try:
             db.session.commit()
             flash('User updated successfully', 'success')
@@ -1337,7 +1365,9 @@ def edit_user(id):
             flash('An error occurred while updating the user. Please try again.', 'error')
             return redirect(url_for('edit_user', id=id))
     
-    return render_template('edit_user.html', user=user)
+    # Get all branches for the form
+    branches = Branch.query.order_by(Branch.name).all()
+    return render_template('edit_user.html', user=user, branches=branches)
 
 @app.route('/delete_user/<int:id>', methods=['POST'])
 @login_required

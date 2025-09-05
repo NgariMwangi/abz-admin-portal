@@ -71,6 +71,7 @@ class User(db.Model):
     role = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     phone = db.Column(db.String, nullable=True)
+    accessible_branch_ids = db.Column(db.JSON, nullable=True, default=list)  # Branch access control
     orders = db.relationship('Order', backref='user', lazy=True)
     stock_transactions = db.relationship('StockTransaction', backref='user', lazy=True)
     payments = db.relationship('Payment', backref='user', lazy=True)
@@ -103,6 +104,43 @@ class User(db.Model):
     def is_password_hashed(self):
         """Check if the password is properly hashed (not plain text)"""
         return self.password.startswith('pbkdf2:sha256:') or self.password.startswith('scrypt:')
+    
+    # Branch access control methods
+    def has_branch_access(self, branch_id):
+        """Check if user has access to a specific branch"""
+        if self.accessible_branch_ids is None or self.accessible_branch_ids == []:
+            return True  # NULL or empty list means access to all branches
+        return branch_id in self.accessible_branch_ids
+    
+    def add_branch_access(self, branch_id):
+        """Add branch access to user"""
+        if not self.accessible_branch_ids:
+            self.accessible_branch_ids = []
+        if branch_id not in self.accessible_branch_ids:
+            self.accessible_branch_ids.append(branch_id)
+    
+    def remove_branch_access(self, branch_id):
+        """Remove branch access from user"""
+        if self.accessible_branch_ids and branch_id in self.accessible_branch_ids:
+            self.accessible_branch_ids.remove(branch_id)
+    
+    def get_accessible_branches(self):
+        """Get Branch objects for accessible branch IDs"""
+        if self.accessible_branch_ids is None or self.accessible_branch_ids == []:
+            return Branch.query.all()  # All branches if NULL or empty list
+        return Branch.query.filter(Branch.id.in_(self.accessible_branch_ids)).all()
+    
+    def has_all_branch_access(self):
+        """Check if user has access to all branches"""
+        return self.accessible_branch_ids is None or self.accessible_branch_ids == []
+    
+    def set_all_branch_access(self):
+        """Give user access to all branches"""
+        self.accessible_branch_ids = []
+    
+    def clear_branch_access(self):
+        """Remove all branch access from user"""
+        self.accessible_branch_ids = []
 
 class PasswordReset(db.Model):
     __tablename__ = 'password_resets'
