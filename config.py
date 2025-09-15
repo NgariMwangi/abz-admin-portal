@@ -7,8 +7,8 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'abz-hardware-secret-key-2024-secure-random-string'
-    # SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:deno0707@localhost/abzone'
-    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:%23Deno0707@69.197.187.23:5432/abzone'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:deno0707@localhost/abzone'
+    # SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:%23Deno0707@69.197.187.23:5432/abzone'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Cloudinary Configuration

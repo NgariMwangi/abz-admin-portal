@@ -267,7 +267,7 @@
                        {% endif %}
                      </td>
                     <td>
-                      <span class="badge badge-primary fs-6">{{ item.quantity }}</span>
+                      <span class="badge badge-primary fs-6">{{ item.quantity | format_quantity }}</span>
                     </td>
                     <td>
                       {% if item.final_price %}

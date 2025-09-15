@@ -140,7 +140,8 @@
               <table class="table table-hover">
                 <thead>
                   <tr>
-                    <th>Product</th>
+                    <th>Product Code</th>
+                    <th>Product Name</th>
                     <th>Quantity</th>
                     <th>Unit Price</th>
                     <th>Total Price</th>
@@ -151,20 +152,22 @@
                 <tbody>
                   {% for item in po.items %}
                   <tr>
-                                            <td>
-                          <div class="fw-bold">{{ item.product_name or 'N/A' }}</div>
-                          <small class="text-muted">{{ item.product_code or 'No code' }}</small>
-                        </td>
-                    <td>{{ item.quantity if item.quantity else '0' }}</td>
+                    <td>
+                      <span class="badge bg-secondary">{{ item.product_code or '' }}</span>
+                    </td>
+                    <td>
+                      <div class="fw-bold">{{ item.product_name or '' }}</div>
+                    </td>
+                    <td>{{ item.quantity | format_quantity if item.quantity else '0' }}</td>
                     <td>KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'N/A' }}</td>
                     <td>
                       <strong>KSh {{ "{:,.0f}".format(item.total_price) if item.total_price else 'N/A' }}</strong>
                     </td>
                     <td>
                       {% if po.status == 'received' %}
-                        <span class="badge bg-success">{{ item.received_quantity if item.received_quantity else 0 }}/{{ item.quantity if item.quantity else 0 }}</span>
+                        <span class="badge bg-success">{{ item.received_quantity | format_quantity if item.received_quantity else '0' }}/{{ item.quantity | format_quantity if item.quantity else '0' }}</span>
                       {% else %}
-                        <span class="badge bg-secondary">{{ item.received_quantity if item.received_quantity else 0 }}/{{ item.quantity if item.quantity else 0 }}</span>
+                        <span class="badge bg-secondary">{{ item.received_quantity | format_quantity if item.received_quantity else '0' }}/{{ item.quantity | format_quantity if item.quantity else '0' }}</span>
                       {% endif %}
                     </td>
                     <td>
@@ -200,16 +203,16 @@
                 <div class="row">
                   <div class="col-md-2">
                     <div class="mb-3">
-                      <label for="product_code" class="form-label">Product Code *</label>
+                      <label for="product_code" class="form-label">Product Code</label>
                       <input type="text" class="form-control" id="product_code" name="product_code" 
-                             placeholder="e.g. HW001" required>
+                             placeholder="e.g. HW001">
                     </div>
                   </div>
                   <div class="col-md-3">
                     <div class="mb-3">
-                      <label for="product_name" class="form-label">Product Name *</label>
+                      <label for="product_name" class="form-label">Product Name</label>
                       <input type="text" class="form-control" id="product_name" name="product_name" 
-                             placeholder="e.g. Steel Bolts" required>
+                             placeholder="e.g. Steel Bolts">
                     </div>
                   </div>
                   <div class="col-md-2">

@@ -43,16 +43,16 @@
             <div class="row">
               <div class="col-md-6">
                 <div class="mb-3">
-                  <label for="product_code" class="form-label">Product Code *</label>
+                  <label for="product_code" class="form-label">Product Code</label>
                   <input type="text" class="form-control" id="product_code" name="product_code"
-                    value="{{ po_item.product_code or '' }}" required>
+                    value="{{ po_item.product_code or '' }}" placeholder="e.g., PROD001">
                 </div>
               </div>
               <div class="col-md-6">
                 <div class="mb-3">
-                  <label for="product_name" class="form-label">Product Name *</label>
+                  <label for="product_name" class="form-label">Product Name</label>
                   <input type="text" class="form-control" id="product_name" name="product_name"
-                    value="{{ po_item.product_name or '' }}" required>
+                    value="{{ po_item.product_name or '' }}" placeholder="Product name">
                 </div>
               </div>
             </div>
@@ -62,7 +62,7 @@
                 <div class="mb-3">
                   <label for="quantity" class="form-label">Quantity *</label>
                   <input type="number" class="form-control" id="quantity" name="quantity"
-                    value="{{ po_item.quantity or 0 }}" min="1" required>
+                    value="{{ po_item.quantity | format_quantity if po_item.quantity else '0' }}" min="1" step="0.001" required>
                 </div>
               </div>
               <div class="col-md-6">
@@ -120,7 +120,7 @@
           </div>
           <div class="mb-2">
             <small class="text-muted">Quantity:</small><br>
-            <strong>{{ po_item.quantity or 0 }}</strong>
+            <strong>{{ po_item.quantity | format_quantity if po_item.quantity else '0' }}</strong>
           </div>
           <div class="mb-2">
             <small class="text-muted">Unit Price:</small><br>

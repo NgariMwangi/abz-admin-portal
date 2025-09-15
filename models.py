@@ -14,29 +14,6 @@ class Branch(db.Model):
     image_url = db.Column(db.String, nullable=True)
     products = db.relationship('Product', backref='branch', lazy=True)
     orders = db.relationship('Order', backref='branch', lazy=True)
-    
-    @property
-    def revenue(self):
-        """Calculate total revenue from completed payments for this branch"""
-        from decimal import Decimal
-        total_revenue = Decimal('0.00')
-        
-        try:
-            for order in self.orders:
-                if hasattr(order, 'payments') and order.payments:
-                    for payment in order.payments:
-                        if hasattr(payment, 'payment_status') and payment.payment_status == 'completed':
-                            if hasattr(payment, 'amount') and payment.amount:
-                                try:
-                                    total_revenue += Decimal(str(payment.amount))
-                                except (ValueError, TypeError):
-                                    # Skip invalid amounts
-                                    continue
-        except Exception as e:
-            print(f"Error calculating revenue for branch {self.id}: {e}")
-            return Decimal('0.00')
-        
-        return total_revenue
 
 
 class Category(db.Model):
@@ -169,9 +146,9 @@ class Product(db.Model):
     branchid = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
     name = db.Column(db.String, nullable=False)
     image_url = db.Column(db.String, nullable=True)
-    buyingprice = db.Column(db.Numeric(10, 2), nullable=True)
-    sellingprice = db.Column(db.Numeric(10, 2), nullable=True)
-    stock = db.Column(db.Integer, nullable=True)
+    buyingprice = db.Column(db.Integer, nullable=True)
+    sellingprice = db.Column(db.Integer, nullable=True)
+    stock = db.Column(db.Numeric(10, 3), nullable=True)  # Support up to 3 decimal places
     productcode = db.Column(db.String, nullable=True)
     display = db.Column(db.Boolean, default=True)  # Controls visibility in customer app
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
@@ -202,9 +179,9 @@ class StockTransaction(db.Model):
     productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     userid = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     transaction_type = db.Column(db.String, nullable=False)  # 'add' or 'remove'
-    quantity = db.Column(db.Integer, nullable=False)
-    previous_stock = db.Column(db.Integer, nullable=False)
-    new_stock = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
+    previous_stock = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
+    new_stock = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     notes = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
 
@@ -238,7 +215,7 @@ class OrderItem(db.Model):
     orderid = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
     product_name = db.Column(db.String(255), nullable=True)  # Product name for both regular and manual items
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     buying_price = db.Column(db.Numeric(10, 2), nullable=True)  # Product buying price at time of order
     original_price = db.Column(db.Numeric(10, 2), nullable=True)  # Original product selling price
     negotiated_price = db.Column(db.Numeric(10, 2), nullable=True)  # Negotiated price (if any)
@@ -427,12 +404,12 @@ class PurchaseOrderItem(db.Model):
     __tablename__ = 'purchase_order_items'
     id = db.Column(db.Integer, primary_key=True)
     purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
-    product_code = db.Column(db.String, nullable=False)  # User manually types product code
+    product_code = db.Column(db.String, nullable=True)  # User manually types product code
     product_name = db.Column(db.String, nullable=True)   # User manually types product name
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     unit_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, filled when invoice received
     total_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, calculated when prices are set
-    received_quantity = db.Column(db.Integer, nullable=False, default=0)
+    received_quantity = db.Column(db.Numeric(10, 3), nullable=False, default=0)  # Support up to 3 decimal places
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
@@ -466,11 +443,11 @@ class QuotationItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     quotation_id = db.Column(db.Integer, db.ForeignKey('quotations.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+    product_name = db.Column(db.String(255), nullable=True)  # For manual items
     # Relationships
     product = db.relationship('Product', backref='quotation_items')

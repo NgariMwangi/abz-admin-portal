@@ -107,7 +107,8 @@
               <table class="table table-hover">
                 <thead>
                   <tr>
-                    <th>Product</th>
+                    <th>Product Code</th>
+                    <th>Product Name</th>
                     <th>Quantity</th>
                     <th>Unit Price</th>
                     <th>Total Price</th>
@@ -118,12 +119,14 @@
                 <tbody>
                   {% for item in po.items %}
                   <tr>
-                                            <td>
-                          <div class="fw-bold">{{ item.product_name or 'N/A' }}</div>
-                          <small class="text-muted">{{ item.product_code or 'No code' }}</small>
-                        </td>
                     <td>
-                      <span class="badge bg-light text-dark">{{ item.quantity }}</span>
+                      <span class="badge bg-secondary">{{ item.product_code or '' }}</span>
+                    </td>
+                    <td>
+                      <div class="fw-bold">{{ item.product_name or '' }}</div>
+                    </td>
+                    <td>
+                      <span class="badge bg-light text-dark">{{ item.quantity | format_quantity }}</span>
                     </td>
                     <td>
                       <strong class="text-primary">KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'Not set' }}</strong>
@@ -133,9 +136,9 @@
                     </td>
                     <td>
                       {% if po.status == 'received' %}
-                        <span class="badge bg-success">{{ item.received_quantity }}/{{ item.quantity }}</span>
+                        <span class="badge bg-success">{{ item.received_quantity | format_quantity }}/{{ item.quantity | format_quantity }}</span>
                       {% else %}
-                        <span class="badge bg-secondary">{{ item.received_quantity }}/{{ item.quantity }}</span>
+                        <span class="badge bg-secondary">{{ item.received_quantity | format_quantity }}/{{ item.quantity | format_quantity }}</span>
                       {% endif %}
                     </td>
                     <td>
@@ -216,7 +219,7 @@
               <ul class="list-unstyled mt-2">
                 {% for item in po.items %}
                 <li class="mb-1">
-                  <small>{{ item.product_name or 'N/A' }}: {{ item.quantity }} × KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'Not set' }} = KSh {{ "{:,.0f}".format(item.total_price) if item.total_price else 'Not set' }}</small>
+                  <small>{{ item.product_name or 'N/A' }}: {{ item.quantity | format_quantity }} × KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'Not set' }} = KSh {{ "{:,.0f}".format(item.total_price) if item.total_price else 'Not set' }}</small>
                 </li>
                 {% endfor %}
               </ul>

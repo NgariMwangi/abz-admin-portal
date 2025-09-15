@@ -88,9 +88,9 @@
                     </td>
                     <td>
                       {% if transaction.transaction_type == 'add' %}
-                        <span class="text-success">+{{ transaction.quantity }}</span>
+                        <span class="text-success">+{{ transaction.quantity | format_quantity }}</span>
                       {% else %}
-                        <span class="text-danger">-{{ transaction.quantity }}</span>
+                        <span class="text-danger">-{{ transaction.quantity | format_quantity }}</span>
                       {% endif %}
                     </td>
                     <td>{{ transaction.previous_stock }}</td>

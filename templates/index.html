@@ -254,6 +254,104 @@
       </div>
     </div>
     
+    <!-- Profit Metrics Row -->
+    <div class="row">
+      <div class="col-sm-6 col-md-3">
+        <div class="card card-stats card-round">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-icon">
+                <div
+                  class="icon-big text-center icon-success bubble-shadow-small"
+                >
+                  <i class="fas fa-chart-pie"></i>
+                </div>
+              </div>
+              <div class="col col-stats ms-3 ms-sm-0">
+                <div class="numbers">
+                  <p class="card-category">Total Profit</p>
+                  <h4 class="card-title {% if total_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    KSh {{ "{:,.0f}".format(total_profit) }}
+                  </h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="card card-stats card-round">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-icon">
+                <div
+                  class="icon-big text-center icon-info bubble-shadow-small"
+                >
+                  <i class="fas fa-chart-bar"></i>
+                </div>
+              </div>
+              <div class="col col-stats ms-3 ms-sm-0">
+                <div class="numbers">
+                  <p class="card-category">Monthly Profit</p>
+                  <h4 class="card-title {% if monthly_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    KSh {{ "{:,.0f}".format(monthly_profit) }}
+                  </h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="card card-stats card-round">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-icon">
+                <div
+                  class="icon-big text-center icon-warning bubble-shadow-small"
+                >
+                  <i class="fas fa-shopping-cart"></i>
+                </div>
+              </div>
+              <div class="col col-stats ms-3 ms-sm-0">
+                <div class="numbers">
+                  <p class="card-category">Total COGS</p>
+                  <h4 class="card-title">KSh {{ "{:,.0f}".format(total_cogs) }}</h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="card card-stats card-round">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-icon">
+                <div
+                  class="icon-big text-center icon-secondary bubble-shadow-small"
+                >
+                  <i class="fas fa-percentage"></i>
+                </div>
+              </div>
+              <div class="col col-stats ms-3 ms-sm-0">
+                <div class="numbers">
+                  <p class="card-category">Profit Margin</p>
+                  <h4 class="card-title {% if total_revenue > 0 and (total_profit / total_revenue * 100) >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {% if total_revenue > 0 %}
+                      {{ "%.1f"|format(total_profit / total_revenue * 100) }}%
+                    {% else %}
+                      0.0%
+                    {% endif %}
+                  </h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- Expense Metrics Row -->
     <div class="row">
       <div class="col-sm-6 col-md-3">

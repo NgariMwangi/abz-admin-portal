@@ -241,18 +241,18 @@ function addItemRow() {
         <div class="row">
             <div class="col-md-3">
                 <div class="mb-2">
-                    <label class="form-label small">Product Code *</label>
+                    <label class="form-label small">Product Code</label>
                     <input type="text" class="form-control form-control-sm" 
                            name="product_code_${itemCounter}" 
-                           placeholder="e.g., PROD001" required>
+                           placeholder="e.g., PROD001">
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="mb-2">
-                    <label class="form-label small">Product Name *</label>
+                    <label class="form-label small">Product Name</label>
                     <input type="text" class="form-control form-control-sm" 
                            name="product_name_${itemCounter}" 
-                           placeholder="Product name" required>
+                           placeholder="Product name">
                 </div>
             </div>
             <div class="col-md-2">
@@ -366,14 +366,15 @@ document.querySelector('form').addEventListener('submit', function(e) {
         const productName = row.querySelector('input[name^="product_name_"]').value.trim();
         const quantity = row.querySelector('input[name^="quantity_"]').value.trim();
         
-        if (productCode && productName && quantity) {
+        // At least one of product name or product code must be provided, plus quantity
+        if ((productCode || productName) && quantity) {
             hasValidItems = true;
         }
     });
     
     if (!hasValidItems) {
         e.preventDefault();
-        alert('Please add at least one valid item to the purchase order.');
+        alert('Please add at least one valid item to the purchase order. Each item must have either a product name or product code (or both), plus a quantity.');
         return false;
     }
     

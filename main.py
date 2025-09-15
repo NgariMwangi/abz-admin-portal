@@ -201,6 +201,50 @@ def index():
         print(f"Error calculating monthly revenue: {e}")
         monthly_revenue = 0
     
+    # Total profit calculation (Revenue - Cost of Goods Sold)
+    try:
+        # Calculate total revenue from approved orders
+        total_revenue_for_profit = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(Order.approvalstatus == True).scalar() or 0
+        
+        # Calculate total cost of goods sold (buying price * quantity sold)
+        total_cogs = db.session.query(func.sum(OrderItem.buying_price * OrderItem.quantity)).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(Order.approvalstatus == True).scalar() or 0
+        
+        # Calculate total profit
+        total_profit = total_revenue_for_profit - total_cogs
+        
+    except Exception as e:
+        print(f"Error calculating total profit: {e}")
+        total_profit = 0
+        total_cogs = 0
+    
+    # Monthly profit calculation
+    try:
+        # Calculate monthly revenue
+        monthly_revenue_for_profit = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
+            and_(Order.approvalstatus == True, Order.created_at >= this_month)
+        ).scalar() or 0
+        
+        # Calculate monthly cost of goods sold
+        monthly_cogs = db.session.query(func.sum(OrderItem.buying_price * OrderItem.quantity)).join(
+            Order, OrderItem.orderid == Order.id
+        ).filter(
+            and_(Order.approvalstatus == True, Order.created_at >= this_month)
+        ).scalar() or 0
+        
+        # Calculate monthly profit
+        monthly_profit = monthly_revenue_for_profit - monthly_cogs
+        
+    except Exception as e:
+        print(f"Error calculating monthly profit: {e}")
+        monthly_profit = 0
+        monthly_cogs = 0
+    
     # Low stock products (less than 10 items)
     try:
         low_stock_products = Product.query.filter(Product.stock < 10).count()
@@ -373,6 +417,10 @@ def index():
                              pending_orders=pending_orders,
                              total_revenue=total_revenue,
                              monthly_revenue=monthly_revenue,
+                             total_profit=total_profit,
+                             monthly_profit=monthly_profit,
+                             total_cogs=total_cogs,
+                             monthly_cogs=monthly_cogs,
                              low_stock_products=low_stock_products,
                              recent_orders_list=recent_orders_list,
                              recent_users=recent_users,
@@ -591,6 +639,26 @@ def delete_from_cloudinary(public_id):
         print(f"Error deleting from Cloudinary: {e}")
         return False
 
+# Custom template filter for formatting quantities
+@app.template_filter('format_quantity')
+def format_quantity(value):
+    """Format quantity to remove unnecessary decimal places"""
+    if value is None:
+        return '0'
+    
+    try:
+        # Convert to float first to handle both int and decimal types
+        float_val = float(value)
+        
+        # If it's a whole number, display without decimals
+        if float_val == int(float_val):
+            return str(int(float_val))
+        else:
+            # If it has decimals, display with appropriate precision
+            return f"{float_val:g}"  # 'g' format removes trailing zeros
+    except (ValueError, TypeError):
+        return str(value)
+
 # Context processor to make branches available to all templates
 @app.context_processor
 def inject_branches():
@@ -754,6 +822,87 @@ def export_products_csv():
     except Exception as e:
         print(f"Error exporting products to CSV: {e}")
         flash('An error occurred while exporting products.', 'error')
+        return redirect(url_for('products'))
+
+@app.route('/export_products_by_category_csv')
+@login_required
+@role_required(['admin'])
+def export_products_by_category_csv():
+    try:
+        # Get branch filter from query parameter
+        branch_id = request.args.get('branch_id', type=int)
+        
+        # Base query with joins
+        base_query = Product.query.join(
+            SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+        ).join(
+            Category, SubCategory.category_id == Category.id, isouter=True
+        ).join(
+            Branch, Product.branchid == Branch.id, isouter=True
+        )
+        
+        # Apply branch filter if specified
+        if branch_id:
+            base_query = base_query.filter(Product.branchid == branch_id)
+        
+        # Get all products ordered by category
+        products = base_query.order_by(Category.name, Product.name).all()
+        
+        # Group products by category
+        products_by_category = {}
+        for product in products:
+            category_name = product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized'
+            if category_name not in products_by_category:
+                products_by_category[category_name] = []
+            products_by_category[category_name].append(product)
+        
+        # Create CSV data
+        csv_data = []
+        csv_data.append(['Category', 'Product Name', 'Stock', 'Buying Price', 'Selling Price'])
+        
+        # Add products grouped by category
+        for category_name in sorted(products_by_category.keys()):
+            category_products = products_by_category[category_name]
+            for i, product in enumerate(category_products):
+                # Format product name with code: "productname - code"
+                product_name_with_code = product.name or ''
+                if product.productcode:
+                    product_name_with_code = f"{product_name_with_code} - {product.productcode}"
+                
+                if i == 0:
+                    # First product in category - include category name
+                    csv_data.append([
+                        category_name,
+                        product_name_with_code,
+                        product.stock or 0,
+                        float(product.buyingprice) if product.buyingprice else 0.0,
+                        float(product.sellingprice) if product.sellingprice else 0.0
+                    ])
+                else:
+                    # Subsequent products in category - leave category name empty
+                    csv_data.append([
+                        '',  # Empty category name for grouping
+                        product_name_with_code,
+                        product.stock or 0,
+                        float(product.buyingprice) if product.buyingprice else 0.0,
+                        float(product.sellingprice) if product.sellingprice else 0.0
+                    ])
+        
+        # Create CSV response
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerows(csv_data)
+        
+        # Create response
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = 'attachment; filename=products_by_category_export.csv'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error exporting products by category to CSV: {e}")
+        flash('An error occurred while exporting products by category.', 'error')
         return redirect(url_for('products'))
 
 @app.route('/branch_products/<int:branch_id>')
@@ -3523,14 +3672,17 @@ def add_po_item(po_id):
         unit_price = request.form.get('unit_price')
         notes = request.form.get('notes')
         
-        if not product_code or not product_name or not quantity:
-            flash('Product Code, Product Name, and Quantity are required', 'error')
+        # At least one of product name or product code must be provided, plus quantity
+        if (not product_code and not product_name) or not quantity:
+            flash('Either product name or product code (or both) and quantity are required', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
         
         try:
-            quantity = int(quantity)
+            quantity = Decimal(str(quantity)) if quantity else None
+            if quantity is not None and quantity <= 0:
+                raise ValueError("Quantity must be positive")
             unit_price = Decimal(str(unit_price)) if unit_price else None
-            total_price = quantity * unit_price if unit_price else None
+            total_price = quantity * unit_price if unit_price and quantity else None
         except (ValueError, TypeError):
             flash('Invalid quantity or unit price', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
@@ -3580,8 +3732,8 @@ def edit_po_item(item_id):
                 print(f"📝 Processing POST request for PO item {item_id}")
                 
                 # Get form data
-                product_code = request.form.get('product_code')
-                product_name = request.form.get('product_name')
+                product_code = request.form.get('product_code', '').strip()
+                product_name = request.form.get('product_name', '').strip()
                 quantity = request.form.get('quantity')
                 unit_price = request.form.get('unit_price')
                 notes = request.form.get('notes')
@@ -3593,15 +3745,17 @@ def edit_po_item(item_id):
                 print(f"   - unit_price: {unit_price}")
                 print(f"   - notes: {notes}")
                 
-                # Validate required fields
-                if not product_code or not product_name or not quantity:
+                # At least one of product name or product code must be provided, plus quantity
+                if (not product_code and not product_name) or not quantity:
                     print(f"❌ Missing required fields")
-                    flash('Product Code, Product Name, and Quantity are required', 'error')
+                    flash('Either product name or product code (or both) and quantity are required', 'error')
                     return redirect(url_for('edit_po_item', item_id=item_id))
                 
                 # Validate numeric fields
                 try:
-                    quantity = int(quantity)
+                    quantity = Decimal(str(quantity)) if quantity else None
+                    if quantity is not None and quantity <= 0:
+                        raise ValueError("Quantity must be positive")
                     unit_price = Decimal(str(unit_price)) if unit_price else None
                 except (ValueError, TypeError):
                     print(f"❌ Invalid quantity or unit price")
@@ -3791,11 +3945,9 @@ def export_purchase_order_pdf(po_id):
             spaceAfter=12
         )
         
-        # Recreate the ABZ Hardware letterhead manually
-        
         # Try to load the logo for the left side
         try:
-            logo_path = os.path.join(app.static_folder, 'assets', 'img', 'logo.png')
+            logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'logo.png')
             if os.path.exists(logo_path):
                 logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
                 logo_cell = logo_image
@@ -3829,9 +3981,9 @@ def export_purchase_order_pdf(po_id):
             <para align=right>
             <b><font size=11 color="#1a365d">Kombo Munyiri Road,</font></b><br/>
             <b><font size=11 color="#1a365d">Gikomba, Nairobi, Kenya</font></b><br/>
-            <font size=10 color="#666666">0711 732 341 or 0725 000 055</font> 📞<br/>
-            <font size=10 color="#666666">info@abzhardware.co.ke</font> ✉<br/>
-            <font size=10 color="#666666">www.abzhardware.co.ke</font> 🌐
+            <font size=9 color="#666666">0711 732 341 or 0725 000 055</font><br/>
+            <font size=9 color="#666666">info@abzhardware.co.ke</font><br/>
+            <font size=9 color="#666666">www.abzhardware.co.ke</font>
             </para>
             ''', normal_style)
         ]]
@@ -3849,10 +4001,9 @@ def export_purchase_order_pdf(po_id):
         
         # Add the colored line separator (yellow and dark blue)
         separator_data = [[""]]
-        separator_table = Table(separator_data, colWidths=[7*inch], rowHeights=[0.15*inch])
+        separator_table = Table(separator_data, colWidths=[7*inch], rowHeights=[0.05*inch])
         separator_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#f4b942')),  # Yellow color
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#1a365d')),   # Dark blue border
         ]))
         
         elements.append(separator_table)
@@ -3867,28 +4018,61 @@ def export_purchase_order_pdf(po_id):
         <b>PO Number:</b> {po.po_number}<br/>
         <b>Date:</b> {po.order_date.strftime('%B %d, %Y') if po.order_date else 'N/A'}<br/>
         <b>Supplier:</b> {po.supplier.name if po.supplier else 'N/A'}<br/>
-        <b>Branch:</b> {po.branch.name if po.branch else 'N/A'}<br/>
-        <b>Expected Delivery:</b> {po.expected_delivery_date.strftime('%B %d, %Y') if po.expected_delivery_date else 'Not specified'}
-        """
+        <b>Branch:</b> {po.branch.name if po.branch else 'N/A'}"""
+        
+        # Only add delivery date if it exists
+        if po.expected_delivery_date:
+            po_details += f"<br/><b>Expected Delivery:</b> {po.expected_delivery_date.strftime('%B %d, %Y')}"
+        
+        po_details += ""
         elements.append(Paragraph(po_details, normal_style))
         elements.append(Spacer(1, 30))
         
-        # Items Table (simplified: Product Code, Product Name, Quantity only)
+        # Items Table
         if po.items:
             elements.append(Paragraph("ITEMS ORDERED", heading_style))
             
-            # Table data - simplified to 3 columns only
+            # Table data - Product Code, Product Name, Quantity
             data = [['Product Code', 'Product Name', 'Quantity']]
             
+            # Create a style for product names that allows wrapping
+            product_name_style = ParagraphStyle(
+                'ProductName',
+                parent=styles['Normal'],
+                fontSize=11,
+                spaceAfter=0,
+                spaceBefore=0,
+                leading=13,  # Line spacing for multi-line text
+                alignment=0,  # Left alignment
+                fontName='Helvetica'
+            )
+            
             for item in po.items:
+                # Format quantity using the same logic as the template filter
+                if item.quantity is None:
+                    formatted_quantity = '0'
+                else:
+                    try:
+                        float_val = float(item.quantity)
+                        if float_val == int(float_val):
+                            formatted_quantity = str(int(float_val))
+                        else:
+                            formatted_quantity = f"{float_val:g}"
+                    except (ValueError, TypeError):
+                        formatted_quantity = str(item.quantity)
+                
+                # Format product name and code separately
+                product_name = item.product_name or ''
+                product_code = item.product_code or ''
+                
                 data.append([
-                    item.product_code or 'N/A',
-                    item.product_name or 'N/A',
-                    str(item.quantity) if item.quantity else '0'
+                    Paragraph(product_code.upper(), product_name_style),
+                    Paragraph(product_name.upper(), product_name_style),
+                    formatted_quantity
                 ])
             
-            # Create table with 3 columns - adjusted for wider page
-            table = Table(data, colWidths=[2.2*inch, 4.5*inch, 1.5*inch])
+            # Create table with 3 columns
+            table = Table(data, colWidths=[2*inch, 4*inch, 1.5*inch])
             table.setStyle(TableStyle([
                 # Header row
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
@@ -3922,6 +4106,23 @@ def export_purchase_order_pdf(po_id):
             elements.append(Paragraph("No items in this purchase order.", normal_style))
             elements.append(Spacer(1, 30))
         
+        # Total Amount
+        if po.total_amount:
+            total_data = [['Total Amount:', f"KSh {po.total_amount:,.2f}"]]
+            
+            total_table = Table(total_data, colWidths=[2*inch, 2*inch])
+            total_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#e2e8f0')),
+            ]))
+            
+            elements.append(total_table)
+            elements.append(Spacer(1, 30))
+        
         # Notes section
         if po.notes:
             elements.append(Paragraph("NOTES", heading_style))
@@ -3932,7 +4133,7 @@ def export_purchase_order_pdf(po_id):
         footer_text = f"""
         <para align=center>
         <font size=8 color="#95a5a6">
-        Generated on {datetime.now(EAT).strftime('%B %d, %Y at %I:%M %p')} by {current_user.firstname} {current_user.lastname}<br/>
+        Generated on {datetime.now(EAT).strftime('%B %d, %Y at %I:%M %p')} by {po.user.firstname} {po.user.lastname}<br/>
         This is a computer-generated document and does not require a signature.
         </font>
         </para>
@@ -3943,19 +4144,19 @@ def export_purchase_order_pdf(po_id):
         # Build PDF
         doc.build(elements)
         
-        # Get PDF data
-        pdf_data = buffer.getvalue()
+        # Get PDF content
+        pdf_content = buffer.getvalue()
         buffer.close()
         
         # Create response
-        response = make_response(pdf_data)
+        response = make_response(pdf_content)
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="PO_{po.po_number}.pdf"'
+        response.headers['Content-Disposition'] = f'attachment; filename=purchase_order_{po.po_number}.pdf'
         
         return response
         
     except Exception as e:
-        print(f"Error generating PDF: {e}")
+        print(f"Error generating purchase order PDF: {e}")
         flash('An error occurred while generating the PDF.', 'error')
         return redirect(url_for('purchase_orders'))
 
@@ -3971,13 +4172,14 @@ def add_purchase_order_item(po_id):
             flash('Cannot add items to a purchase order that is not in draft or submitted status', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
         
-        product_code = request.form.get('product_code')
-        product_name = request.form.get('product_name')
+        product_code = request.form.get('product_code', '').strip()
+        product_name = request.form.get('product_name', '').strip()
         quantity = request.form.get('quantity')
         notes = request.form.get('notes', '')
         
-        if not product_code or not product_name or not quantity:
-            flash('Product code, name, and quantity are required', 'error')
+        # At least one of product name or product code must be provided, plus quantity
+        if (not product_code and not product_name) or not quantity:
+            flash('Either product name or product code (or both) and quantity are required', 'error')
             return redirect(url_for('edit_purchase_order', id=po_id))
         
         try:
