@@ -3945,29 +3945,18 @@ def export_purchase_order_pdf(po_id):
             spaceAfter=12
         )
         
-        # Try to load the logo for the left side
+        # Load the logo image
         try:
-            logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'logo.png')
-            if os.path.exists(logo_path):
-                logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
-                logo_cell = logo_image
-            else:
-                # Fallback to text if logo not found
-                logo_cell = Paragraph('''
-                <para align=left>
-                <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
-                <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
-                <b><font size=14 color="#1a365d">LIMITED</font></b>
-                </para>
-                ''', normal_style)
+            logo_path = os.path.join(app.static_folder, 'assets', 'img', 'logo.png')
+            print(f"Loading logo from: {logo_path}")
+            logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
+            logo_cell = logo_image
         except Exception as e:
             print(f"Error loading logo: {e}")
-            # Fallback to text if logo fails to load
+            # Create a placeholder if logo fails to load
             logo_cell = Paragraph('''
             <para align=left>
-            <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
-            <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
-            <b><font size=14 color="#1a365d">LIMITED</font></b>
+            <b><font size=18 color="#1a365d">ABZ HARDWARE LIMITED</font></b>
             </para>
             ''', normal_style)
         
