@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Product Search Functionality - AJAX search with URL updates
-    const productSearch = document.getElementById('productSearch');
+    const productSearch = document.getElementById('productSearch') || document.getElementById('catalogSearch');
     const categoryFilter = document.getElementById('categoryFilter');
     const displayFilter = document.getElementById('displayFilter');
     const perPageSelect = document.querySelector('select[name="per_page"]');
@@ -107,22 +107,33 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle pagination clicks with event delegation
     document.addEventListener('click', function(e) {
         if (e.target.closest('.pagination .page-link')) {
-            e.preventDefault();
             const link = e.target.closest('.page-link');
             const href = link.getAttribute('href');
             if (href) {
                 console.log('Pagination clicked:', href);
+                
+                // For Product Catalog page, use regular navigation to preserve modals
+                if (window.location.pathname === '/product_catalog') {
+                    console.log('Using regular navigation for Product Catalog page');
+                    window.location.href = href;
+                    return;
+                }
+                
+                // For other pages, use AJAX pagination
+                e.preventDefault();
                 performPagination(href);
             }
         }
     });
     
     function showLoading() {
-        const tableBody = document.querySelector('#productsTable tbody');
+        // Try to find the table body - check for both productsTable and catalogTable
+        const tableBody = document.querySelector('#productsTable tbody') || document.querySelector('#catalogTable tbody');
         if (tableBody) {
             // Determine the number of columns based on the page type
-            const columnCount = isBranchProductsPage ? 10 : 11;
-            console.log('Showing loading with column count:', columnCount);
+            const isCatalogPage = window.location.pathname === '/product_catalog';
+            const columnCount = isBranchProductsPage ? 10 : (isCatalogPage ? 8 : 11);
+            console.log('Showing loading with column count:', columnCount, 'for page:', isCatalogPage ? 'catalog' : 'products');
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="${columnCount}" class="text-center py-4">
@@ -147,6 +158,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         console.log('Performing search...');
+        
+        // For Product Catalog page, use regular form submission to preserve modals
+        if (window.location.pathname === '/product_catalog') {
+            console.log('Using regular form submission for Product Catalog page');
+            searchForm.submit();
+            return;
+        }
         
         // Show loading indicator
         showLoading();
@@ -189,9 +207,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
             
-            // Extract the table body content
-            const newTableBody = tempDiv.querySelector('#productsTable tbody');
-            const currentTableBody = document.querySelector('#productsTable tbody');
+            // Extract the table body content - check for both table types
+            const newTableBody = tempDiv.querySelector('#productsTable tbody') || tempDiv.querySelector('#catalogTable tbody');
+            const currentTableBody = document.querySelector('#productsTable tbody') || document.querySelector('#catalogTable tbody');
             
             if (newTableBody && currentTableBody) {
                 // Update the table content
@@ -210,6 +228,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (newResultCount && currentResultCount) {
                     currentResultCount.innerHTML = newResultCount.innerHTML;
                 }
+                
+                // Update items per page selector if it exists
+                const newItemsPerPage = tempDiv.querySelector('.items-per-page');
+                const currentItemsPerPage = document.querySelector('.items-per-page');
+                if (newItemsPerPage && currentItemsPerPage) {
+                    currentItemsPerPage.innerHTML = newItemsPerPage.innerHTML;
+                }
+                
+                // Re-initialize functions that might be lost during AJAX updates
+                initializePageFunctions();
+                
+                // Re-initialize Bootstrap components for any new content
+                reinitializeBootstrapComponents();
                 
                 console.log('Search results updated successfully');
             } else {
@@ -254,9 +285,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
             
-            // Extract the table body content
-            const newTableBody = tempDiv.querySelector('#productsTable tbody');
-            const currentTableBody = document.querySelector('#productsTable tbody');
+            // Extract the table body content - check for both table types
+            const newTableBody = tempDiv.querySelector('#productsTable tbody') || tempDiv.querySelector('#catalogTable tbody');
+            const currentTableBody = document.querySelector('#productsTable tbody') || document.querySelector('#catalogTable tbody');
             
             if (newTableBody && currentTableBody) {
                 // Update the table content
@@ -275,6 +306,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (newResultCount && currentResultCount) {
                     currentResultCount.innerHTML = newResultCount.innerHTML;
                 }
+                
+                // Update items per page selector if it exists
+                const newItemsPerPage = tempDiv.querySelector('.items-per-page');
+                const currentItemsPerPage = document.querySelector('.items-per-page');
+                if (newItemsPerPage && currentItemsPerPage) {
+                    currentItemsPerPage.innerHTML = newItemsPerPage.innerHTML;
+                }
+                
+                // Re-initialize functions that might be lost during AJAX updates
+                initializePageFunctions();
+                
+                // Re-initialize Bootstrap components for any new content
+                reinitializeBootstrapComponents();
                 
                 console.log('Pagination results updated successfully');
             } else {
@@ -303,6 +347,61 @@ document.addEventListener('DOMContentLoaded', function() {
         performSearch();
     };
     
+    // Initialize page-specific functions
+    initializePageFunctions();
+    
     console.log('Search functionality initialized successfully');
     console.log('Page type:', isBranchProductsPage ? 'Branch Products' : 'Main Products');
-}); 
+});
+
+// Function to initialize page-specific functions that might be lost during AJAX updates
+function initializePageFunctions() {
+    // Re-initialize changeItemsPerPage function for catalog pages
+    if (window.location.pathname === '/product_catalog') {
+        window.changeItemsPerPage = function(perPage) {
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('per_page', perPage);
+            currentUrl.searchParams.set('page', '1'); // Reset to first page
+            window.location.href = currentUrl.toString();
+        };
+    }
+}
+
+// Function to reinitialize Bootstrap components after AJAX content updates
+function reinitializeBootstrapComponents() {
+    console.log('Reinitializing Bootstrap components...');
+    
+    // Dispose all existing modal instances to prevent conflicts
+    document.querySelectorAll('.modal').forEach(function(modalElement) {
+        const existingInstance = bootstrap.Modal.getInstance(modalElement);
+        if (existingInstance) {
+            console.log('Disposing existing modal instance for:', modalElement.id);
+            existingInstance.dispose();
+        }
+    });
+    
+    // Reinitialize tooltips if they exist
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        }
+    });
+    
+    // Reinitialize popovers if they exist
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverTriggerList.map(function (popoverTriggerEl) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+            return new bootstrap.Popover(popoverTriggerEl);
+        }
+    });
+    
+    // Make sure modal functions are available globally after AJAX updates
+    if (window.location.pathname.includes('/branch_products/')) {
+        // The modal functions should already be globally available from the main page script
+        // Just ensure Bootstrap modals are properly initialized
+        console.log('Branch products page detected, modal functions should be available globally');
+    }
+    
+    console.log('Bootstrap components reinitialized');
+} 

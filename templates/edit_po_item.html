@@ -58,14 +58,40 @@
             </div>
 
             <div class="row">
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <div class="mb-3">
                   <label for="quantity" class="form-label">Quantity *</label>
                   <input type="number" class="form-control" id="quantity" name="quantity"
                     value="{{ po_item.quantity | format_quantity if po_item.quantity else '0' }}" min="1" step="0.001" required>
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <label for="unit" class="form-label">Unit</label>
+                <select class="form-control" id="unit" name="unit">
+                    <option value="pieces" {% if po_item.unit == 'pieces' %}selected{% endif %}>Pieces</option>
+                    <option value="box" {% if po_item.unit == 'box' %}selected{% endif %}>Box</option>
+                    <option value="carton" {% if po_item.unit == 'carton' %}selected{% endif %}>Carton</option>
+                    <option value="sack" {% if po_item.unit == 'sack' %}selected{% endif %}>Sack</option>
+                    <option value="packet" {% if po_item.unit == 'packet' %}selected{% endif %}>Packet</option>
+                    <option value="kg" {% if po_item.unit == 'kg' %}selected{% endif %}>Kilogram</option>
+                    <option value="g" {% if po_item.unit == 'g' %}selected{% endif %}>Gram</option>
+                    <option value="liter" {% if po_item.unit == 'liter' %}selected{% endif %}>Liter</option>
+                    <option value="ml" {% if po_item.unit == 'ml' %}selected{% endif %}>Milliliter</option>
+                    <option value="meter" {% if po_item.unit == 'meter' %}selected{% endif %}>Meter</option>
+                    <option value="cm" {% if po_item.unit == 'cm' %}selected{% endif %}>Centimeter</option>
+                    <option value="dozen" {% if po_item.unit == 'dozen' %}selected{% endif %}>Dozen</option>
+                    <option value="pack" {% if po_item.unit == 'pack' %}selected{% endif %}>Pack</option>
+                    <option value="set" {% if po_item.unit == 'set' %}selected{% endif %}>Set</option>
+                    <option value="pair" {% if po_item.unit == 'pair' %}selected{% endif %}>Pair</option>
+                    <option value="roll" {% if po_item.unit == 'roll' %}selected{% endif %}>Roll</option>
+                    <option value="rolls" {% if po_item.unit == 'rolls' %}selected{% endif %}>Rolls</option>
+                    <option value="sheet" {% if po_item.unit == 'sheet' %}selected{% endif %}>Sheet</option>
+                    <option value="unit" {% if po_item.unit == 'unit' %}selected{% endif %}>Unit</option>
+                </select>
+                </div>
+              </div>
+              <div class="col-md-4">
                 <div class="mb-3">
                   <label for="unit_price" class="form-label">Unit Price (KSh)</label>
                   <input type="number" class="form-control" id="unit_price" name="unit_price"
@@ -73,11 +99,6 @@
                   <small class="form-text text-muted">Leave empty if price is not yet determined</small>
                 </div>
               </div>
-            </div>
-
-            <div class="mb-3">
-              <label for="notes" class="form-label">Notes</label>
-              <textarea class="form-control" id="notes" name="notes" rows="3">{{ po_item.notes or '' }}</textarea>
             </div>
 
             <div class="d-flex justify-content-between">

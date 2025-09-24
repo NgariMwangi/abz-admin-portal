@@ -192,7 +192,7 @@
                       <td>
                         {% if product.stock is not none %}
                           <span class="badge badge-{{ 'success' if product.stock > 10 else 'warning' if product.stock > 0 else 'danger' }}">
-                            {{ product.stock }}
+                            {{ product.stock | format_stock }}
                           </span>
                         {% else %}
                           <span class="text-muted">-</span>
@@ -211,7 +211,7 @@
                              class="btn btn-sm btn-outline-primary" title="Edit Product">
                             <i class="fas fa-edit"></i>
                           </a>
-                          <a href="{{ url_for('stock_history', product_id=product.id) }}" 
+                          <a href="{{ url_for('stock_history', branch_product_id=product.id) }}" 
                              class="btn btn-sm btn-outline-info" title="Stock History">
                             <i class="fas fa-history"></i>
                           </a>

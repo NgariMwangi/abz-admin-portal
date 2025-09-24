@@ -65,14 +65,14 @@
                       </div>
                     </td>
                     <td>
-                      <span class="badge badge-info">{{ branch.products|length }} products</span>
+                      <span class="badge badge-info">{{ branch.product_count }} products</span>
                     </td>
                     <td>
-                      <span class="badge badge-warning">{{ branch.orders|length }} orders</span>
+                      <span class="badge badge-warning">{{ branch.order_count }} orders</span>
                     </td>
                     <td>
                       <strong>KSh {{ "%.2f"|format(branch.revenue) }}</strong>
-                      <br><small class="text-muted">Orders: {{ branch.orders|length }}</small>
+                      <br><small class="text-muted">Orders: {{ branch.order_count }}</small>
                     </td>
                     <td>
                       <div class="btn-group" role="group">
@@ -82,7 +82,7 @@
                         <a href="{{ url_for('edit_branch', id=branch.id) }}" class="btn btn-sm btn-outline-primary" title="Edit Branch">
                           <i class="fas fa-edit"></i>
                         </a>
-                        {% if not branch.products and not branch.orders %}
+                        {% if not branch.product_count and not branch.order_count %}
                         <button type="button" class="btn btn-sm btn-outline-danger" 
                                 onclick="confirmDelete({{ branch.id }}, '{{ branch.name }}')" 
                                 title="Delete Branch">
@@ -180,7 +180,7 @@
              <h4 class="card-title">
                {% set total_products = 0 %}
                {% for branch in branches %}
-                 {% set total_products = total_products + branch.products|length %}
+                 {% set total_products = total_products + branch.product_count %}
                {% endfor %}
                {{ total_products }}
              </h4>
@@ -197,7 +197,7 @@
              <h4 class="card-title">
                {% set total_orders = 0 %}
                {% for branch in branches %}
-                 {% set total_orders = total_orders + branch.orders|length %}
+                 {% set total_orders = total_orders + branch.order_count %}
                {% endfor %}
                {{ total_orders }}
              </h4>

@@ -260,7 +260,7 @@
                     </td>
                     <td>
                       <span class="badge {% if product.stock > 10 %}badge-success{% elif product.stock > 0 %}badge-warning{% else %}badge-danger{% endif %}">
-                        {{ product.stock or 0 }}
+                        {{ product.stock | format_stock }}
                       </span>
                     </td>
                     <td>
@@ -275,7 +275,7 @@
                     </td>
                     <td>
                       <div class="btn-group" role="group">
-                        <a href="{{ url_for('stock_history', product_id=product.id) }}" class="btn btn-sm btn-outline-info" title="Stock History">
+                        <a href="{{ url_for('stock_history', branch_product_id=product.id) }}" class="btn btn-sm btn-outline-info" title="Stock History">
                           <i class="fas fa-history"></i>
                         </a>
                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="editProduct({{ product.id }})" title="Edit Product">

@@ -10,6 +10,76 @@
       </div>
     </div>
 
+    <!-- Order Statistics Cards -->
+    <div class="row mb-4">
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-primary bubble-shadow-small mb-3">
+              <i class="fas fa-shopping-cart"></i>
+            </div>
+            <h4 class="card-title">{{ total_orders }}</h4>
+            <p class="card-category">Total Orders</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <h4 class="card-title">{{ paid_orders }}</h4>
+            <p class="card-category">Paid Orders</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-warning bubble-shadow-small mb-3">
+              <i class="fas fa-clock"></i>
+            </div>
+            <h4 class="card-title">{{ pending_orders }}</h4>
+            <p class="card-category">Pending Orders</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-info bubble-shadow-small mb-3">
+              <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <h4 class="card-title">KSh {{ "{:,.0f}".format(total_revenue) }}</h4>
+            <p class="card-category">Total Revenue</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <h4 class="card-title">KSh {{ "{:,.0f}".format(monthly_profit) }}</h4>
+            <p class="card-category">Monthly Profit</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card card-round">
+          <div class="card-body text-center">
+            <div class="icon-big text-center icon-success bubble-shadow-small mb-3">
+              <i class="fas fa-trophy"></i>
+            </div>
+            <h4 class="card-title">KSh {{ "{:,.0f}".format(total_profit) }}</h4>
+            <p class="card-category">Total Profit</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Filters Section -->
     <div class="row mb-4">
       <div class="col-md-12">

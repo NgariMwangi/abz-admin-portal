@@ -71,15 +71,15 @@
 }
 </style>
 
-<!-- Include search functionality -->
-<script src="{{ url_for('static', filename='js/search.js') }}"></script>
+<!-- Search functionality disabled - using simple form-based search instead -->
+<!-- <script src="{{ url_for('static', filename='js/search.js') }}"></script> -->
 
 <div class="container">
   <div class="page-inner">
     <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
       <div>
-        <h3 class="fw-bold mb-3">Product Management</h3>
-        <h6 class="op-7 mb-2">Manage your products and categories by branch</h6>
+        <h3 class="fw-bold mb-3">Branch Products Management</h3>
+        <h6 class="op-7 mb-2">Manage branch-specific products, pricing, and stock levels</h6>
       </div>
       <div class="ms-md-auto py-2 py-md-0">
         <div class="btn-group" role="group">
@@ -112,7 +112,6 @@
               <div class="col-md-4">
                 <label for="branchSelect" class="form-label">Choose Branch</label>
                 <select class="form-control" id="branchSelect" name="branch_id" onchange="this.form.submit()">
-                  <option value="">All Branches</option>
                   {% for branch in branches %}
                   <option value="{{ branch.id }}" {% if selected_branch_id == branch.id %}selected{% endif %}>
                     {{ branch.name }} - {{ branch.location }}
@@ -239,18 +238,18 @@
                   <tr>
                     <td>{{ product.id }}</td>
                     <td>
-                      {% if product.image_url %}
-                      <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
+                      {% if product.catalog_product and product.catalog_product.image_url %}
+                      <img src="{{ product.catalog_product.image_url }}" alt="{{ product.catalog_product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
                       {% else %}
                       <span class="text-muted">No image</span>
                       {% endif %}
                     </td>
-                    <td>{{ product.name | upper }}</td>
+                    <td>{{ (product.catalog_product.name if product.catalog_product else 'Unknown Product') | upper }}</td>
 
                     <td>
-                      {% if product.sub_category %}
-                        <span class="badge bg-primary">{{ product.sub_category.name }}</span>
-                        <br><small class="text-muted">{{ product.sub_category.category.name }}</small>
+                      {% if product.catalog_product and product.catalog_product.sub_category %}
+                        <span class="badge bg-primary">{{ product.catalog_product.sub_category.name }}</span>
+                        <br><small class="text-muted">{{ product.catalog_product.sub_category.category.name }}</small>
                       {% else %}
                         <span class="text-muted">No category</span>
                       {% endif %}
@@ -264,10 +263,10 @@
                     </td>
                     <td>{{ product.buyingprice }}</td>
                     <td>{{ product.sellingprice }}</td>
-                    <td>{{ product.stock }}</td>
-                    <td>{{ product.productcode }}</td>
+                    <td>{{ product.stock | format_stock }}</td>
+                    <td>{{ product.catalog_product.productcode if product.catalog_product else 'N/A' }}</td>
                     <td>
-                      <form action="{{ url_for('toggle_display', product_id=product.id) }}" method="POST" style="display: inline;">
+                      <form action="{{ url_for('toggle_display', branch_product_id=product.id) }}" method="POST" style="display: inline;">
                         <button type="submit" class="btn btn-sm {% if product.display %}btn-success{% else %}btn-secondary{% endif %}" title="{% if product.display %}Visible in customer app{% else %}Hidden from customer app{% endif %}">
                           <i class="fas {% if product.display %}fa-eye{% else %}fa-eye-slash{% endif %}"></i>
                         </button>
@@ -284,10 +283,10 @@
                         <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#removeStockModal{{ product.id }}" title="Remove Stock">
                           <i class="fas fa-minus"></i>
                         </button>
-                        <button class="btn btn-info btn-sm" onclick="window.location.href='{{ url_for('stock_history', product_id=product.id) }}'" title="Stock History">
+                        <button class="btn btn-info btn-sm" onclick="window.location.href='{{ url_for('stock_history', branch_product_id=product.id) }}'" title="Stock History">
                           <i class="fas fa-history"></i>
                         </button>
-                        <a href="{{ url_for('product_descriptions', product_id=product.id) }}" class="btn btn-secondary btn-sm" title="Manage Descriptions">
+                        <a href="{{ url_for('product_descriptions', product_id=product.catalog_product.id) if product.catalog_product else '#' }}" class="btn btn-secondary btn-sm" title="Manage Descriptions">
                           <i class="fas fa-file-alt"></i>
                         </a>
                         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProductModal{{ product.id }}" title="Edit Product">
@@ -308,24 +307,26 @@
                           <h5 class="modal-title">Edit Product</h5>
                           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form action="{{ url_for('edit_product', id=product.id) }}" method="POST" enctype="multipart/form-data">
+                        <form action="{{ url_for('edit_branch_product', id=product.id) }}" method="POST" enctype="multipart/form-data">
                           <div class="modal-body">
                             <div class="row">
                               <div class="col-md-6">
                                 <div class="mb-3">
                                   <label for="editProductName{{ product.id }}" class="form-label">Name</label>
-                                  <input type="text" class="form-control" id="editProductName{{ product.id }}" name="name" value="{{ product.name }}" required>
+                                  <input type="text" class="form-control" id="editProductName{{ product.id }}" name="name" value="{{ product.catalog_product.name if product.catalog_product else '' }}" required readonly>
+                                  <small class="form-text text-muted">Product name cannot be changed here. Edit in catalog.</small>
                                 </div>
                                 <div class="mb-3">
                                   <label for="editProductSubcategory{{ product.id }}" class="form-label">Subcategory</label>
-                                  <select class="form-control" id="editProductSubcategory{{ product.id }}" name="subcategory_id">
+                                  <select class="form-control" id="editProductSubcategory{{ product.id }}" name="subcategory_id" disabled>
                                     <option value="">No subcategory</option>
                                     {% for subcategory in subcategories %}
-                                    <option value="{{ subcategory.id }}" {% if subcategory.id == product.subcategory_id %}selected{% endif %}>
+                                    <option value="{{ subcategory.id }}" {% if product.catalog_product and subcategory.id == product.catalog_product.subcategory_id %}selected{% endif %}>
                                       {{ subcategory.name }} ({{ subcategory.category.name }})
                                     </option>
                                     {% endfor %}
                                   </select>
+                                  <small class="form-text text-muted">Category cannot be changed here. Edit in catalog.</small>
                                 </div>
                                 <div class="mb-3">
                                   <label for="editProductBranch{{ product.id }}" class="form-label">Branch</label>
@@ -351,14 +352,16 @@
                                 </div>
                                 <div class="mb-3">
                                   <label for="editProductCode{{ product.id }}" class="form-label">Product Code</label>
-                                  <input type="text" class="form-control" id="editProductCode{{ product.id }}" name="productcode" value="{{ product.productcode }}">
+                                  <input type="text" class="form-control" id="editProductCode{{ product.id }}" name="productcode" value="{{ product.catalog_product.productcode if product.catalog_product else '' }}" readonly>
+                                  <small class="form-text text-muted">Product code cannot be changed here. Edit in catalog.</small>
                                 </div>
                                 <div class="mb-3">
                                   <label for="editProductImage{{ product.id }}" class="form-label">Product Image</label>
-                                  <input type="file" class="form-control" id="editProductImage{{ product.id }}" name="image">
-                                  {% if product.image_url %}
-                                  <small class="text-muted">Current: {{ product.image_url }}</small>
+                                  <input type="file" class="form-control" id="editProductImage{{ product.id }}" name="image" disabled>
+                                  {% if product.catalog_product and product.catalog_product.image_url %}
+                                  <small class="text-muted">Current: {{ product.catalog_product.image_url }}</small>
                                   {% endif %}
+                                  <small class="form-text text-muted">Product image cannot be changed here. Edit in catalog.</small>
                                 </div>
                                 <div class="mb-3">
                                   <div class="form-check">
@@ -409,11 +412,11 @@
                           <h5 class="modal-title">Add Stock - {{ product.name }}</h5>
                           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form action="{{ url_for('add_stock', product_id=product.id) }}" method="POST">
+                        <form action="{{ url_for('add_stock', branch_product_id=product.id) }}" method="POST">
                           <div class="modal-body">
                             <div class="mb-3">
                               <label class="form-label">Current Stock</label>
-                              <input type="text" class="form-control" value="{{ product.stock or 0 }}" readonly>
+                              <input type="text" class="form-control" value="{{ product.stock | format_stock }}" readonly>
                             </div>
                             <div class="mb-3">
                               <label for="addStockQuantity{{ product.id }}" class="form-label">Quantity to Add</label>
@@ -441,11 +444,11 @@
                           <h5 class="modal-title">Remove Stock - {{ product.name }}</h5>
                           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form action="{{ url_for('remove_stock', product_id=product.id) }}" method="POST">
+                        <form action="{{ url_for('remove_stock', branch_product_id=product.id) }}" method="POST">
                           <div class="modal-body">
                             <div class="mb-3">
                               <label class="form-label">Current Stock</label>
-                              <input type="text" class="form-control" value="{{ product.stock or 0 }}" readonly>
+                              <input type="text" class="form-control" value="{{ product.stock | format_stock }}" readonly>
                             </div>
                             <div class="mb-3">
                               <label for="removeStockQuantity{{ product.id }}" class="form-label">Quantity to Remove</label>
@@ -582,7 +585,7 @@
         <h5 class="modal-title">Add New Product</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data">
+      <form action="{{ url_for('add_product_to_catalog') }}" method="POST" enctype="multipart/form-data">
         <div class="modal-body">
           <div class="row">
             <div class="col-md-6">

@@ -162,20 +162,27 @@
                 <p>Dashboard</p>
               </a>
             </li>
+            <li class="nav-item {% if request.endpoint == 'product_catalog' %}active{% endif %}">
+              <a href="{{ url_for('product_catalog') }}">
+                <i class="fas fa-cube"></i>
+                <p>Products Catalog</p>
+              </a>
+            </li>
             <li class="nav-item {% if request.endpoint in ['products', 'branch_products'] %}active{% endif %}">
               <a data-bs-toggle="collapse" href="#productsDropdown">
                 <i class="fas fa-box"></i>
-                <p>Products</p>
+                <p>Branch Products</p>
                 <span class="caret"></span>
               </a>
               <div class="collapse" id="productsDropdown">
                 <ul class="nav nav-collapse">
+                  {% for branch in branches %}
                   <li class="nav-item">
-                    <a href="{{ url_for('products') }}">
-                      <span class="sub-item">All Products</span>
+                    <a href="{{ url_for('products', branch_id=branch.id) }}">
+                      <span class="sub-item">{{ branch.name }}</span>
                     </a>
                   </li>
-               
+                  {% endfor %}
                 </ul>
               </div>
             </li>
@@ -198,10 +205,27 @@
               </a>
             </li>
             <li class="nav-item {% if request.endpoint in ['orders', 'order_details'] %}active{% endif %}">
-              <a href="{{ url_for('orders') }}">
+              <a data-bs-toggle="collapse" href="#ordersMenu">
                 <i class="fas fa-shopping-cart"></i>
                 <p>Orders</p>
+                <span class="caret"></span>
               </a>
+              <div class="collapse" id="ordersMenu">
+                <ul class="nav nav-collapse">
+                  <li class="nav-item {% if request.endpoint == 'orders' and not request.args.get('branch_id') %}active{% endif %}">
+                    <a href="{{ url_for('orders') }}">
+                      <span class="sub-item">All Orders</span>
+                    </a>
+                  </li>
+                  {% for branch in branches %}
+                  <li class="nav-item {% if request.endpoint == 'orders' and request.args.get('branch_id') == branch.id|string %}active{% endif %}">
+                    <a href="{{ url_for('orders', branch_id=branch.id) }}">
+                      <span class="sub-item">{{ branch.name }}</span>
+                    </a>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
             </li>
             <li class="nav-item {% if request.endpoint in ['users', 'add_user', 'edit_user'] %}active{% endif %}">
               <a href="{{ url_for('users') }}">
@@ -247,6 +271,29 @@
                 <i class="fas fa-shopping-cart"></i>
                 <p>Purchase Orders</p>
               </a>
+            </li>
+            <li class="nav-item {% if request.endpoint in ['sales_report', 'sales_report_branch'] %}active{% endif %}">
+              <a data-bs-toggle="collapse" href="#salesReportMenu">
+                <i class="fas fa-chart-bar"></i>
+                <p>Sales Report</p>
+                <span class="caret"></span>
+              </a>
+              <div class="collapse" id="salesReportMenu">
+                <ul class="nav nav-collapse">
+                  <li class="nav-item {% if request.endpoint == 'sales_report' and not request.args.get('branch_id') %}active{% endif %}">
+                    <a href="{{ url_for('sales_report') }}">
+                      <span class="sub-item">All Branches</span>
+                    </a>
+                  </li>
+                  {% for branch in branches %}
+                  <li class="nav-item {% if request.endpoint == 'sales_report' and request.args.get('branch_id') == branch.id|string %}active{% endif %}">
+                    <a href="{{ url_for('sales_report', branch_id=branch.id) }}">
+                      <span class="sub-item">{{ branch.name }}</span>
+                    </a>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
             </li>
           </ul>
         </div>
@@ -482,9 +529,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (currentPath === '/' || currentPath === '/index' || currentPath === '/dashboard') {
         activeItem = document.querySelector('.sidebar a[href="/"]').closest('.nav-item');
         console.log('Setting Dashboard as active');
-    } else if (currentPath === '/products' || currentPath.startsWith('/branch_products/')) {
+    } else if (currentPath === '/product_catalog') {
+        activeItem = document.querySelector('.sidebar a[href="/product_catalog"]').closest('.nav-item');
+        console.log('Setting Products Catalog as active');
+    } else if (currentPath === '/products' || currentPath.startsWith('/products?') || currentPath.startsWith('/branch_products/')) {
         activeItem = document.querySelector('.sidebar a[data-bs-toggle="collapse"]').closest('.nav-item');
-        console.log('Setting Products as active');
+        console.log('Setting Branch Products as active');
         
         // Expand the products dropdown
         const productsCollapse = document.getElementById('productsDropdown');

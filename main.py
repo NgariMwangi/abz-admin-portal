@@ -49,8 +49,27 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# Custom template filter for formatting stock numbers
+@app.template_filter('format_stock')
+def format_stock(value):
+    """Format stock numbers without unnecessary decimal places."""
+    if value is None:
+        return '0'
+    
+    # Convert to float to handle any type
+    try:
+        num = float(value)
+        # If it's a whole number, return as integer
+        if num == int(num):
+            return str(int(num))
+        else:
+            # If it has decimals, format to remove trailing zeros
+            return f"{num:g}"
+    except (ValueError, TypeError):
+        return str(value)
+
 # Import models after db is initialized
-from models import Branch, Category, User, Product, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription, Expense, Supplier, PurchaseOrder, PurchaseOrderItem
+from models import Branch, Category, User, OrderType, Order, OrderItem, StockTransaction, Payment, SubCategory, ProductDescription, Expense, Supplier, PurchaseOrder, PurchaseOrderItem, ProductCatalog, BranchProduct, Quotation, QuotationItem
 
 # Define EAT timezone
 EAT = timezone(timedelta(hours=3))
@@ -105,7 +124,7 @@ def index():
     # Dashboard statistics
     try:
         total_users = User.query.count()
-        total_products = Product.query.count()
+        total_products = BranchProduct.query.count()
         total_orders = Order.query.count()
         total_branches = Branch.query.count()
     except Exception as e:
@@ -119,41 +138,41 @@ def index():
     # Exclude products with no buying price, zero stock, or null stock
     try:
         total_product_asset = db.session.query(
-            func.sum(Product.buyingprice * Product.stock)
+            func.sum(BranchProduct.buyingprice * BranchProduct.stock)
         ).filter(
             and_(
-                Product.buyingprice.isnot(None),  # Exclude products with no buying price
-                Product.buyingprice > 0,          # Exclude products with zero buying price
-                Product.stock.isnot(None),        # Exclude products with null stock
-                Product.stock > 0                 # Exclude products with zero stock
+                BranchProduct.buyingprice.isnot(None),  # Exclude products with no buying price
+                BranchProduct.buyingprice > 0,          # Exclude products with zero buying price
+                BranchProduct.stock.isnot(None),        # Exclude products with null stock
+                BranchProduct.stock > 0                 # Exclude products with zero stock
             )
         ).scalar() or 0
     except Exception as e:
         print(f"Error calculating total product asset: {e}")
         total_product_asset = 0
     
-    # Product asset statistics
+    # ProductCatalog asset statistics
     try:
-        products_with_assets = db.session.query(Product).filter(
+        products_with_assets = db.session.query(BranchProduct).filter(
             and_(
-                Product.buyingprice.isnot(None),
-                Product.buyingprice > 0,
-                Product.stock.isnot(None),
-                Product.stock > 0
+                BranchProduct.buyingprice.isnot(None),
+                BranchProduct.buyingprice > 0,
+                BranchProduct.stock.isnot(None),
+                BranchProduct.stock > 0
             )
         ).count()
         
-        products_without_buying_price = db.session.query(Product).filter(
+        products_without_buying_price = db.session.query(BranchProduct).filter(
             or_(
-                Product.buyingprice.is_(None),
-                Product.buyingprice == 0
+                BranchProduct.buyingprice.is_(None),
+                BranchProduct.buyingprice == 0
             )
         ).count()
         
-        products_with_zero_stock = db.session.query(Product).filter(
+        products_with_zero_stock = db.session.query(BranchProduct).filter(
             or_(
-                Product.stock.is_(None),
-                Product.stock == 0
+                BranchProduct.stock.is_(None),
+                BranchProduct.stock == 0
             )
         ).count()
     except Exception as e:
@@ -181,21 +200,21 @@ def index():
         print(f"Error getting pending orders count: {e}")
         pending_orders = 0
     
-    # Total revenue (from approved orders)
+    # Total revenue (from completed payments)
     try:
-        total_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
-            Order, OrderItem.orderid == Order.id
-        ).filter(Order.approvalstatus == True).scalar() or 0
+        total_revenue = db.session.query(func.sum(Payment.amount)).join(
+            Order, Payment.orderid == Order.id
+        ).filter(Payment.payment_status == 'completed').scalar() or 0
     except Exception as e:
         print(f"Error calculating total revenue: {e}")
         total_revenue = 0
     
-    # Monthly revenue
+    # Monthly revenue (from completed payments)
     try:
-        monthly_revenue = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
-            Order, OrderItem.orderid == Order.id
+        monthly_revenue = db.session.query(func.sum(Payment.amount)).join(
+            Order, Payment.orderid == Order.id
         ).filter(
-            and_(Order.approvalstatus == True, Order.created_at >= this_month)
+            and_(Payment.payment_status == 'completed', Payment.created_at >= this_month)
         ).scalar() or 0
     except Exception as e:
         print(f"Error calculating monthly revenue: {e}")
@@ -203,18 +222,26 @@ def index():
     
     # Total profit calculation (Revenue - Cost of Goods Sold)
     try:
-        # Calculate total revenue from approved orders
-        total_revenue_for_profit = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+        # Calculate total profit from completed payments
+        total_profit = db.session.query(func.sum((OrderItem.final_price - OrderItem.buying_price) * OrderItem.quantity)).join(
             Order, OrderItem.orderid == Order.id
-        ).filter(Order.approvalstatus == True).scalar() or 0
+        ).join(
+            Payment, Order.id == Payment.orderid
+        ).filter(
+            Payment.payment_status == 'completed',
+            OrderItem.final_price.isnot(None),
+            OrderItem.buying_price.isnot(None)
+        ).scalar() or 0
         
-        # Calculate total cost of goods sold (buying price * quantity sold)
+        # Calculate total cost of goods sold for completed payments
         total_cogs = db.session.query(func.sum(OrderItem.buying_price * OrderItem.quantity)).join(
             Order, OrderItem.orderid == Order.id
-        ).filter(Order.approvalstatus == True).scalar() or 0
-        
-        # Calculate total profit
-        total_profit = total_revenue_for_profit - total_cogs
+        ).join(
+            Payment, Order.id == Payment.orderid
+        ).filter(
+            Payment.payment_status == 'completed',
+            OrderItem.buying_price.isnot(None)
+        ).scalar() or 0
         
     except Exception as e:
         print(f"Error calculating total profit: {e}")
@@ -223,22 +250,26 @@ def index():
     
     # Monthly profit calculation
     try:
-        # Calculate monthly revenue
-        monthly_revenue_for_profit = db.session.query(func.sum(OrderItem.final_price * OrderItem.quantity)).join(
+        # Calculate monthly profit from completed payments
+        monthly_profit = db.session.query(func.sum((OrderItem.final_price - OrderItem.buying_price) * OrderItem.quantity)).join(
             Order, OrderItem.orderid == Order.id
+        ).join(
+            Payment, Order.id == Payment.orderid
         ).filter(
-            and_(Order.approvalstatus == True, Order.created_at >= this_month)
+            and_(Payment.payment_status == 'completed', Payment.created_at >= this_month),
+            OrderItem.final_price.isnot(None),
+            OrderItem.buying_price.isnot(None)
         ).scalar() or 0
         
-        # Calculate monthly cost of goods sold
+        # Calculate monthly cost of goods sold for completed payments
         monthly_cogs = db.session.query(func.sum(OrderItem.buying_price * OrderItem.quantity)).join(
             Order, OrderItem.orderid == Order.id
+        ).join(
+            Payment, Order.id == Payment.orderid
         ).filter(
-            and_(Order.approvalstatus == True, Order.created_at >= this_month)
+            and_(Payment.payment_status == 'completed', Payment.created_at >= this_month),
+            OrderItem.buying_price.isnot(None)
         ).scalar() or 0
-        
-        # Calculate monthly profit
-        monthly_profit = monthly_revenue_for_profit - monthly_cogs
         
     except Exception as e:
         print(f"Error calculating monthly profit: {e}")
@@ -247,7 +278,7 @@ def index():
     
     # Low stock products (less than 10 items)
     try:
-        low_stock_products = Product.query.filter(Product.stock < 10).count()
+        low_stock_products = BranchProduct.query.filter(BranchProduct.stock < 10).count()
     except Exception as e:
         print(f"Error getting low stock products count: {e}")
         low_stock_products = 0
@@ -257,7 +288,7 @@ def index():
         recent_orders_list = db.session.query(Order).options(
             db.joinedload(Order.user),
             db.joinedload(Order.branch),
-            db.joinedload(Order.order_items).joinedload(OrderItem.product)
+            db.joinedload(Order.order_items).joinedload(OrderItem.branch_product).joinedload(BranchProduct.catalog_product)
         ).order_by(Order.created_at.desc()).limit(5).all()
         
         # Calculate totals for each recent order
@@ -269,9 +300,9 @@ def index():
                     # Use the final_price if available (for manually entered items or negotiated prices)
                     item_total = item.final_price * item.quantity
                     total_amount += item_total
-                elif item.product and item.product.sellingprice:
-                    # Use product's selling price if no final_price but product relationship exists
-                    item_total = item.product.sellingprice * item.quantity
+                elif item.branch_product and item.branch_product.sellingprice:
+                    # Use branch product's selling price if no final_price but branch_product relationship exists
+                    item_total = item.branch_product.sellingprice * item.quantity
                     total_amount += item_total
                 elif hasattr(item, 'product_name') and item.product_name and item.original_price:
                     # For manually entered items without product relationship, check if they have a price
@@ -281,42 +312,25 @@ def index():
             # Store the calculated total on the order object for template use
             order.calculated_total = total_amount
             
-            # Calculate profit for the order
-            total_profit = 0
+            # Calculate profit for the order using OrderItem fields directly
+            order_profit = 0
             print(f"🔍 Dashboard: Calculating profit for order {order.id} with {len(order.order_items)} items")
             for item in order.order_items:
-                print(f"  📦 Dashboard Item {item.id}: final_price={item.final_price}, product_id={item.productid}")
+                print(f"  📦 Dashboard Item {item.id}: final_price={item.final_price}, buying_price={item.buying_price}")
                 
-                if item.final_price:
-                    print(f"    ✅ Has final_price: {item.final_price}")
-                    # For items with final_price, calculate profit if we have buying price
-                    if item.product and item.product.buyingprice:
-                        item_profit = (item.final_price - item.product.buyingprice) * item.quantity
-                        total_profit += item_profit
-                        print(f"      💰 Product profit: ({item.final_price} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
-                    elif hasattr(item, 'buying_price') and item.buying_price:
-                        item_profit = (item.final_price - item.buying_price) * item.quantity
-                        total_profit += item_profit
-                        print(f"      💰 Manual item profit: ({item.final_price} - {item.buying_price}) × {item.quantity} = {item_profit}")
-                    else:
-                        print(f"      ⚠️ No buying price available for item with final_price")
-                elif item.product and item.product.sellingprice and item.product.buyingprice:
-                    # For items using product selling price, calculate profit
-                    item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
-                    total_profit += item_profit
-                    print(f"    📊 Product prices profit: ({item.product.sellingprice} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
+                # Use final_price as selling price and buying_price from OrderItem table
+                if item.final_price and item.buying_price:
+                    item_profit = (item.final_price - item.buying_price) * item.quantity
+                    order_profit += item_profit
+                    print(f"    💰 Profit: ({item.final_price} - {item.buying_price}) × {item.quantity} = {item_profit}")
                 else:
                     print(f"    ⚠️ Cannot calculate profit - missing price data")
-                    if item.product:
-                        print(f"      Product: buyingprice={item.product.buyingprice}, sellingprice={item.product.sellingprice}")
-                    if hasattr(item, 'buying_price'):
-                        print(f"      Item buying_price: {item.buying_price}")
-                    if hasattr(item, 'original_price'):
-                        print(f"      Item original_price: {item.original_price}")
+                    print(f"      final_price: {item.final_price}")
+                    print(f"      buying_price: {item.buying_price}")
             
             # Store the calculated profit on the order object for template use
-            order.calculated_profit = total_profit
-            print(f"🔍 Dashboard: Order {order.id}: calculated_profit = {total_profit}")
+            order.calculated_profit = order_profit
+            print(f"🔍 Dashboard: Order {order.id}: calculated_profit = {order_profit}")
         
         # Add adjusted times (3 hours ahead) for display
         for order in recent_orders_list:
@@ -333,7 +347,7 @@ def index():
     try:
         for branch in Branch.query.all():
             try:
-                branch_products = Product.query.filter_by(branchid=branch.id).count()
+                branch_products = BranchProduct.query.filter_by(branchid=branch.id).count()
                 branch_orders = Order.query.filter_by(branchid=branch.id).count()
                 branch_stats.append({
                     'branch': branch,
@@ -351,13 +365,17 @@ def index():
         print(f"Error getting branch statistics: {e}")
         branch_stats = []
     
-    # Top selling products
+    # Top selling products (using completed payments to match sales report)
     try:
         top_products = db.session.query(
-            Product, func.sum(OrderItem.quantity).label('total_sold'), func.avg(OrderItem.final_price).label('avg_final_price')
-        ).join(OrderItem, Product.id == OrderItem.productid).join(
+            BranchProduct, func.sum(OrderItem.quantity).label('total_sold'), func.avg(OrderItem.final_price).label('avg_final_price')
+        ).join(OrderItem, BranchProduct.id == OrderItem.branch_productid).join(
             Order, OrderItem.orderid == Order.id
-        ).filter(Order.approvalstatus == True).group_by(Product.id).order_by(
+        ).join(
+            Payment, Order.id == Payment.orderid
+        ).filter(
+            Payment.payment_status == 'completed'
+        ).group_by(BranchProduct.id).order_by(
             func.sum(OrderItem.quantity).desc()
         ).limit(5).all()
     except Exception as e:
@@ -367,15 +385,15 @@ def index():
     # Top products by asset value (buying price * stock)
     try:
         top_products_by_asset_value = db.session.query(
-            Product, (Product.buyingprice * Product.stock).label('asset_value')
+            BranchProduct, (BranchProduct.buyingprice * BranchProduct.stock).label('asset_value')
         ).filter(
             and_(
-                Product.buyingprice.isnot(None),
-                Product.buyingprice > 0,
-                Product.stock.isnot(None),
-                Product.stock > 0
+                BranchProduct.buyingprice.isnot(None),
+                BranchProduct.buyingprice > 0,
+                BranchProduct.stock.isnot(None),
+                BranchProduct.stock > 0
             )
-        ).order_by((Product.buyingprice * Product.stock).desc()).limit(5).all()
+        ).order_by((BranchProduct.buyingprice * BranchProduct.stock).desc()).limit(5).all()
     except Exception as e:
         print(f"Error getting top products by asset value: {e}")
         top_products_by_asset_value = []
@@ -569,9 +587,9 @@ def debug_order(order_id):
                 'product_name': item.product_name if hasattr(item, 'product_name') else None,
                 'final_price': float(item.final_price) if item.final_price else None,
                 'quantity': item.quantity,
-                'has_product': item.product is not None,
-                'product_buying_price': float(item.product.buyingprice) if item.product and item.product.buyingprice else None,
-                'product_selling_price': float(item.product.sellingprice) if item.product and item.product.sellingprice else None,
+                'has_product': item.branch_product is not None,
+                'product_buying_price': float(item.branch_product.buyingprice) if item.branch_product and item.branch_product.buyingprice else None,
+                'product_selling_price': float(item.branch_product.sellingprice) if item.branch_product and item.branch_product.sellingprice else None,
                 'has_buying_price': hasattr(item, 'buying_price') and item.buying_price is not None,
                 'buying_price': float(item.buying_price) if hasattr(item, 'buying_price') and item.buying_price else None,
                 'has_original_price': hasattr(item, 'original_price') and item.original_price is not None,
@@ -685,8 +703,10 @@ def products():
     subcategories = SubCategory.query.order_by(SubCategory.name).all()
     branches = Branch.query.order_by(Branch.name).all()
     
-    # Get selected branch from query parameter
+    # Get selected branch from query parameter - default to first branch if none selected
     selected_branch_id = request.args.get('branch_id', type=int)
+    if not selected_branch_id and branches:
+        selected_branch_id = branches[0].id
     
     # Search and filter parameters
     search = request.args.get('search', '')
@@ -697,22 +717,26 @@ def products():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)  # Default 10 items per page
     
-    # Base query - join with SubCategory and Category for better search
-    base_query = Product.query.join(
-        SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+    # Base query - show BranchProduct items for the selected branch
+    base_query = BranchProduct.query.join(
+        ProductCatalog, BranchProduct.catalog_id == ProductCatalog.id
+    ).join(
+        SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
     ).join(
         Category, SubCategory.category_id == Category.id, isouter=True
+    ).join(
+        Branch, BranchProduct.branchid == Branch.id
     )
     
     # Apply filters
     if selected_branch_id:
-        base_query = base_query.filter(Product.branchid == selected_branch_id)
+        base_query = base_query.filter(BranchProduct.branchid == selected_branch_id)
     
     if search:
         base_query = base_query.filter(
             or_(
-                Product.name.ilike(f'%{search}%'),
-                Product.productcode.ilike(f'%{search}%'),
+                ProductCatalog.name.ilike(f'%{search}%'),
+                ProductCatalog.productcode.ilike(f'%{search}%'),
                 SubCategory.name.ilike(f'%{search}%'),
                 Category.name.ilike(f'%{search}%')
             )
@@ -721,13 +745,14 @@ def products():
     if category_filter:
         base_query = base_query.filter(SubCategory.name == category_filter)
     
-    if display_filter == 'true':
-        base_query = base_query.filter(Product.display == True)
-    elif display_filter == 'false':
-        base_query = base_query.filter(Product.display == False)
+    if display_filter:
+        if display_filter == 'active':
+            base_query = base_query.filter(BranchProduct.display == True)
+        elif display_filter == 'inactive':
+            base_query = base_query.filter(BranchProduct.display == False)
     
     # Apply pagination
-    pagination = base_query.order_by(Product.id).paginate(
+    pagination = base_query.order_by(BranchProduct.id).paginate(
         page=page, 
         per_page=per_page, 
         error_out=False
@@ -768,27 +793,22 @@ def export_products_csv():
         branch_id = request.args.get('branch_id', type=int)
         
         # Base query with joins
-        base_query = Product.query.join(
-            SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+        base_query = ProductCatalog.query.join(
+            SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
         ).join(
             Category, SubCategory.category_id == Category.id, isouter=True
-        ).join(
-            Branch, Product.branchid == Branch.id, isouter=True
         )
         
-        # Apply branch filter if specified
-        if branch_id:
-            base_query = base_query.filter(Product.branchid == branch_id)
+        # Note: ProductCatalog is global, so we don't filter by branch_id
         
-        # Get all products
+        # Get all catalog products
         products = base_query.all()
         
         # Create CSV data
         csv_data = []
         csv_data.append([
-            'Product ID', 'Product Code', 'Product Name', 'Category', 'Subcategory', 
-            'Branch', 'Buying Price', 'Selling Price', 'Stock', 'Display Status', 
-            'Created Date', 'Updated Date'
+            'ProductCatalog ID', 'ProductCatalog Code', 'ProductCatalog Name', 'Category', 'Subcategory', 
+            'Image URL'
         ])
         
         for product in products:
@@ -798,13 +818,7 @@ def export_products_csv():
                 product.name or '',
                 product.sub_category.category.name if product.sub_category and product.sub_category.category else '',
                 product.sub_category.name if product.sub_category else '',
-                product.branch.name if product.branch else '',
-                float(product.buyingprice) if product.buyingprice else 0.0,
-                float(product.sellingprice) if product.sellingprice else 0.0,
-                product.stock or 0,
-                'Visible' if product.display else 'Hidden',
-                product.created_at.strftime('%Y-%m-%d %H:%M:%S') if product.created_at else '',
-                product.updated_at.strftime('%Y-%m-%d %H:%M:%S') if product.updated_at else ''
+                product.image_url or ''
             ])
         
         # Create CSV response
@@ -833,20 +847,16 @@ def export_products_by_category_csv():
         branch_id = request.args.get('branch_id', type=int)
         
         # Base query with joins
-        base_query = Product.query.join(
-            SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+        base_query = ProductCatalog.query.join(
+            SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
         ).join(
             Category, SubCategory.category_id == Category.id, isouter=True
-        ).join(
-            Branch, Product.branchid == Branch.id, isouter=True
         )
         
-        # Apply branch filter if specified
-        if branch_id:
-            base_query = base_query.filter(Product.branchid == branch_id)
+        # Note: ProductCatalog is global, so we don't filter by branch_id
         
-        # Get all products ordered by category
-        products = base_query.order_by(Category.name, Product.name).all()
+        # Get all catalog products ordered by category
+        products = base_query.order_by(Category.name, ProductCatalog.name).all()
         
         # Group products by category
         products_by_category = {}
@@ -858,7 +868,7 @@ def export_products_by_category_csv():
         
         # Create CSV data
         csv_data = []
-        csv_data.append(['Category', 'Product Name', 'Stock', 'Buying Price', 'Selling Price'])
+        csv_data.append(['Category', 'ProductCatalog Name', 'ProductCatalog Code'])
         
         # Add products grouped by category
         for category_name in sorted(products_by_category.keys()):
@@ -874,18 +884,14 @@ def export_products_by_category_csv():
                     csv_data.append([
                         category_name,
                         product_name_with_code,
-                        product.stock or 0,
-                        float(product.buyingprice) if product.buyingprice else 0.0,
-                        float(product.sellingprice) if product.sellingprice else 0.0
+                        product.productcode or ''
                     ])
                 else:
                     # Subsequent products in category - leave category name empty
                     csv_data.append([
                         '',  # Empty category name for grouping
                         product_name_with_code,
-                        product.stock or 0,
-                        float(product.buyingprice) if product.buyingprice else 0.0,
-                        float(product.sellingprice) if product.sellingprice else 0.0
+                        product.productcode or ''
                     ])
         
         # Create CSV response
@@ -924,9 +930,11 @@ def branch_products(branch_id):
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
-    # Filter products by the specific branch and join with categories for search
-    base_query = Product.query.filter(Product.branchid == branch_id).join(
-        SubCategory, Product.subcategory_id == SubCategory.id, isouter=True
+    # Filter branch products by the specific branch and join with catalog and categories for search
+    base_query = BranchProduct.query.filter(BranchProduct.branchid == branch_id).join(
+        ProductCatalog, BranchProduct.catalog_id == ProductCatalog.id
+    ).join(
+        SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
     ).join(
         Category, SubCategory.category_id == Category.id, isouter=True
     )
@@ -935,8 +943,8 @@ def branch_products(branch_id):
     if search:
         base_query = base_query.filter(
             or_(
-                Product.name.ilike(f'%{search}%'),
-                Product.productcode.ilike(f'%{search}%'),
+                ProductCatalog.name.ilike(f'%{search}%'),
+                ProductCatalog.productcode.ilike(f'%{search}%'),
                 SubCategory.name.ilike(f'%{search}%'),
                 Category.name.ilike(f'%{search}%')
             )
@@ -946,25 +954,25 @@ def branch_products(branch_id):
         base_query = base_query.filter(SubCategory.name == category_filter)
     
     if display_filter == 'true':
-        base_query = base_query.filter(Product.display == True)
+        base_query = base_query.filter(BranchProduct.display == True)
     elif display_filter == 'false':
-        base_query = base_query.filter(Product.display == False)
+        base_query = base_query.filter(BranchProduct.display == False)
     
     # Apply pagination
-    pagination = base_query.order_by(Product.id).paginate(
+    pagination = base_query.order_by(BranchProduct.id).paginate(
         page=page, 
         per_page=per_page, 
         error_out=False
     )
     
-    products = pagination.items
+    branch_products = pagination.items
     
     # Check if this is an AJAX request
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         # Return only the table content for AJAX requests
         return render_template('branch_products_table_partial.html', 
                              branch=branch,
-                             products=products, 
+                             branch_products=branch_products, 
                              branches=branches,
                              pagination=pagination,
                              search=search,
@@ -976,7 +984,7 @@ def branch_products(branch_id):
                              branch=branch,
                              categories=categories, 
                              subcategories=subcategories,
-                             products=products, 
+                             branch_products=branch_products, 
                              branches=branches,
                              pagination=pagination,
                              search=search,
@@ -1091,11 +1099,347 @@ def delete_category(id):
         flash('An error occurred while deleting the category. Please try again.', 'error')
         return redirect(url_for('categories'))
 
-# Products Routes
-@app.route('/add_product', methods=['POST'])
+# ProductCatalog Catalog Routes
+@app.route('/product_catalog')
 @login_required
 @role_required(['admin'])
-def add_product():
+def product_catalog():
+    categories = Category.query.order_by(Category.name).all()
+    subcategories = SubCategory.query.order_by(SubCategory.name).all()
+    
+    # Search and filter parameters
+    search = request.args.get('search', '')
+    category_filter = request.args.get('category', '')
+    
+    # Pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    # Base query - join with SubCategory and Category for better search
+    base_query = ProductCatalog.query.join(
+        SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
+    ).join(
+        Category, SubCategory.category_id == Category.id, isouter=True
+    )
+    
+    # Apply filters
+    if search:
+        base_query = base_query.filter(
+            or_(
+                ProductCatalog.name.ilike(f'%{search}%'),
+                ProductCatalog.productcode.ilike(f'%{search}%'),
+                SubCategory.name.ilike(f'%{search}%'),
+                Category.name.ilike(f'%{search}%')
+            )
+        )
+    
+    if category_filter:
+        base_query = base_query.filter(SubCategory.name == category_filter)
+    
+    # Apply pagination
+    pagination = base_query.order_by(ProductCatalog.id).paginate(
+        page=page, 
+        per_page=per_page, 
+        error_out=False
+    )
+    
+    catalog_products = pagination.items
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Return only the table content for AJAX requests
+        return render_template('product_catalog_table_partial.html', 
+                             categories=categories,
+                             subcategories=subcategories,
+                             catalog_products=catalog_products, 
+                             pagination=pagination,
+                             search=search,
+                             category_filter=category_filter)
+    else:
+        # Return full page for regular requests
+        return render_template('product_catalog.html', 
+                             categories=categories, 
+                             subcategories=subcategories,
+                             catalog_products=catalog_products, 
+                             pagination=pagination,
+                             search=search,
+                             category_filter=category_filter)
+
+@app.route('/add_product_to_catalog', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def add_product_to_catalog():
+    # Get form data
+    name = request.form.get('name')
+    subcategory_id = request.form.get('subcategory_id')
+    productcode = request.form.get('productcode')
+    
+    # Basic validation
+    if not name:
+        flash('ProductCatalog name is required', 'error')
+        return redirect(url_for('product_catalog'))
+    
+    # Handle file upload to Cloudinary
+    image_url = None
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and allowed_file(file.filename):
+            try:
+                # Upload to Cloudinary
+                image_url = upload_to_cloudinary(file)
+                if not image_url:
+                    flash('Failed to upload image. Please try again.', 'error')
+                    return redirect(url_for('product_catalog'))
+            except Exception as e:
+                flash(f'Error uploading image: {str(e)}', 'error')
+                return redirect(url_for('product_catalog'))
+    
+    # Convert empty strings to None
+    subcategory_id = int(subcategory_id) if subcategory_id else None
+    
+    new_catalog_product = ProductCatalog(
+        name=name,
+        subcategory_id=subcategory_id,
+        productcode=productcode,
+        image_url=image_url
+    )
+    
+    db.session.add(new_catalog_product)
+    db.session.commit()
+    
+    flash('ProductCatalog added to catalog successfully', 'success')
+    return redirect(url_for('product_catalog'))
+
+@app.route('/edit_catalog_product/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def edit_catalog_product(id):
+    catalog_product = ProductCatalog.query.get_or_404(id)
+    
+    # Get form data
+    catalog_product.name = request.form.get('name')
+    catalog_product.subcategory_id = request.form.get('subcategory_id') if request.form.get('subcategory_id') else None
+    catalog_product.productcode = request.form.get('productcode')
+    
+    # Basic validation
+    if not catalog_product.name:
+        flash('ProductCatalog name is required', 'error')
+        return redirect(url_for('product_catalog'))
+    
+    # Handle file upload if a new image is provided
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and allowed_file(file.filename):
+            try:
+                # Delete old image from Cloudinary if it exists
+                if catalog_product.image_url:
+                    delete_from_cloudinary(catalog_product.image_url)
+                
+                # Upload new image to Cloudinary
+                image_url = upload_to_cloudinary(file)
+                if not image_url:
+                    flash('Failed to upload new image. Please try again.', 'error')
+                    return redirect(url_for('product_catalog'))
+                
+                catalog_product.image_url = image_url
+            except Exception as e:
+                flash(f'Error uploading image: {str(e)}', 'error')
+                return redirect(url_for('product_catalog'))
+    
+    db.session.commit()
+    
+    flash('Catalog product updated successfully', 'success')
+    return redirect(url_for('product_catalog'))
+
+@app.route('/delete_catalog_product/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_catalog_product(id):
+    try:
+        catalog_product = ProductCatalog.query.get_or_404(id)
+        
+        # Check if catalog product has branch products
+        if catalog_product.branch_products:
+            flash('Cannot delete this catalog product. It has associated branch products.', 'error')
+            return redirect(url_for('product_catalog'))
+        
+        # Delete associated image if exists
+        if catalog_product.image_url:
+            try:
+                delete_from_cloudinary(catalog_product.image_url)
+            except Exception as e:
+                print(f"Error deleting image from Cloudinary: {e}")
+        
+        db.session.delete(catalog_product)
+        db.session.commit()
+        
+        flash('Catalog product deleted successfully', 'success')
+        return redirect(url_for('product_catalog'))
+    except IntegrityError as e:
+        db.session.rollback()
+        flash('Cannot delete this catalog product. It has associated branch products or other related records.', 'error')
+        return redirect(url_for('product_catalog'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the catalog product. Please try again.', 'error')
+        return redirect(url_for('product_catalog'))
+
+@app.route('/get_catalog_product/<int:id>')
+@login_required
+@role_required(['admin'])
+def get_catalog_product(id):
+    catalog_product = ProductCatalog.query.get_or_404(id)
+    return jsonify({
+        'id': catalog_product.id,
+        'name': catalog_product.name,
+        'productcode': catalog_product.productcode,
+        'subcategory_id': catalog_product.subcategory_id,
+        'image_url': catalog_product.image_url
+    })
+
+# Branch ProductCatalogs Routes
+@app.route('/add_branch_product', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def add_branch_product():
+    # Get form data
+    catalog_id = request.form.get('catalog_id')
+    branchid = request.form.get('branchid')
+    buyingprice = request.form.get('buyingprice')
+    sellingprice = request.form.get('sellingprice')
+    stock = request.form.get('stock')
+    display = request.form.get('display') == 'on'
+    
+    # Basic validation
+    if not catalog_id or not branchid:
+        flash('Catalog product and Branch are required', 'error')
+        return redirect(url_for('products', branch_id=branchid))
+    
+    # Check if branch product already exists for this catalog product and branch
+    existing_branch_product = BranchProduct.query.filter_by(
+        catalog_id=catalog_id, 
+        branchid=branchid
+    ).first()
+    
+    if existing_branch_product:
+        flash('This product already exists in this branch. Please edit the existing entry instead.', 'error')
+        return redirect(url_for('products', branch_id=branchid))
+    
+    # Convert empty strings to None
+    buyingprice = float(buyingprice) if buyingprice else None
+    sellingprice = float(sellingprice) if sellingprice else None
+    stock = int(stock) if stock else None
+    
+    new_branch_product = BranchProduct(
+        catalog_id=catalog_id,
+        branchid=branchid,
+        buyingprice=buyingprice,
+        sellingprice=sellingprice,
+        stock=stock,
+        display=display
+    )
+    
+    db.session.add(new_branch_product)
+    db.session.commit()
+    
+    flash('ProductCatalog added to branch successfully', 'success')
+    return redirect(url_for('branch_products', branch_id=branchid))
+
+@app.route('/edit_branch_product/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def edit_branch_product(id):
+    branch_product = BranchProduct.query.get_or_404(id)
+    
+    # Get form data
+    branch_product.buyingprice = float(request.form.get('buyingprice')) if request.form.get('buyingprice') else None
+    branch_product.sellingprice = float(request.form.get('sellingprice')) if request.form.get('sellingprice') else None
+    branch_product.stock = int(request.form.get('stock')) if request.form.get('stock') else None
+    branch_product.display = request.form.get('display') == 'on'
+    
+    db.session.commit()
+    
+    flash('Branch product updated successfully', 'success')
+    return redirect(url_for('products', branch_id=branch_product.branchid))
+
+@app.route('/delete_branch_product/<int:id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_branch_product(id):
+    try:
+        branch_product = BranchProduct.query.get_or_404(id)
+        branch_id = branch_product.branchid
+        
+        # Check if branch product has related records
+        if branch_product.order_items or branch_product.stock_transactions:
+            flash('Cannot delete this branch product. It has associated orders or stock transactions.', 'error')
+            return redirect(url_for('products', branch_id=branch_id))
+        
+        db.session.delete(branch_product)
+        db.session.commit()
+        
+        flash('Branch product deleted successfully', 'success')
+        return redirect(url_for('products', branch_id=branch_id))
+    except IntegrityError as e:
+        db.session.rollback()
+        flash('Cannot delete this branch product. It has associated orders, stock transactions, or other related records.', 'error')
+        return redirect(url_for('products', branch_id=branch_id))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the branch product. Please try again.', 'error')
+        return redirect(url_for('products', branch_id=branch_id))
+
+@app.route('/get_branch_product/<int:id>')
+@login_required
+@role_required(['admin'])
+def get_branch_product(id):
+    branch_product = BranchProduct.query.get_or_404(id)
+    return jsonify({
+        'id': branch_product.id,
+        'catalog_id': branch_product.catalog_id,
+        'branchid': branch_product.branchid,
+        'buyingprice': branch_product.buyingprice,
+        'sellingprice': branch_product.sellingprice,
+        'stock': branch_product.stock,
+        'display': branch_product.display,
+        'catalog_product_name': branch_product.catalog_product.name if branch_product.catalog_product else None
+    })
+
+@app.route('/get_catalog_products_for_branch')
+@login_required
+@role_required(['admin'])
+def get_catalog_products_for_branch():
+    branch_id = request.args.get('branch_id', type=int)
+    search = request.args.get('search', '')
+    
+    # Get catalog products that are not already in this branch
+    existing_catalog_ids = db.session.query(BranchProduct.catalog_id).filter_by(branchid=branch_id).subquery()
+    
+    base_query = ProductCatalog.query.filter(~ProductCatalog.id.in_(existing_catalog_ids))
+    
+    if search:
+        base_query = base_query.filter(
+            or_(
+                ProductCatalog.name.ilike(f'%{search}%'),
+                ProductCatalog.productcode.ilike(f'%{search}%')
+            )
+        )
+    
+    catalog_products = base_query.limit(20).all()
+    
+    return jsonify([{
+        'id': cp.id,
+        'name': cp.name,
+        'productcode': cp.productcode,
+        'image_url': cp.image_url
+    } for cp in catalog_products])
+
+# ProductCatalogs Routes (Legacy - to be removed later)
+# DEPRECATED: Legacy product route - use ProductCatalog instead
+# @app.route('/add_product', methods=['POST'])
+# @login_required
+# @role_required(['admin'])
+# def add_product():
     # Get form data
     name = request.form.get('name')
     subcategory_id = request.form.get('subcategory_id')
@@ -1133,7 +1477,7 @@ def add_product():
     # Handle display field
     display = request.form.get('display') == 'on'
     
-    new_product = Product(
+    new_product = ProductCatalog(
         name=name,
         subcategory_id=subcategory_id if subcategory_id else None,
         branchid=branchid,  # Use the selected branch ID
@@ -1148,32 +1492,34 @@ def add_product():
     db.session.add(new_product)
     db.session.commit()
     
-    flash('Product added successfully', 'success')
+    flash('ProductCatalog added successfully', 'success')
     return redirect(url_for('products'))
 
-@app.route('/get_product/<int:id>')
-@login_required
-@role_required(['admin'])
-def get_product(id):
-    product = Product.query.get_or_404(id)
-    return jsonify({
-        'id': product.id,
-        'name': product.name,
-        'productcode': product.productcode,
-        'subcategory_id': product.subcategory_id,
-        'branchid': product.branchid,
-        'buyingprice': product.buyingprice,
-        'sellingprice': product.sellingprice,
-        'stock': product.stock,
-        'display': product.display,
-        'image_url': product.image_url
-    })
+# DEPRECATED: Legacy product route - use ProductCatalog instead
+# @app.route('/get_product/<int:id>')
+# @login_required
+# @role_required(['admin'])
+# def get_product(id):
+#     product = ProductCatalog.query.get_or_404(id)
+#     return jsonify({
+#         'id': product.id,
+#         'name': product.name,
+#         'productcode': product.productcode,
+#         'subcategory_id': product.subcategory_id,
+#         'branchid': product.branchid,
+#         'buyingprice': product.buyingprice,
+#         'sellingprice': product.sellingprice,
+#         'stock': product.stock,
+#         'display': product.display,
+#         'image_url': product.image_url
+#     })
 
-@app.route('/edit_product/<int:id>', methods=['POST'])
-@login_required
-@role_required(['admin'])
-def edit_product(id):
-    product = Product.query.get_or_404(id)
+# DEPRECATED: Legacy product route - use ProductCatalog instead
+# @app.route('/edit_product/<int:id>', methods=['POST'])
+# @login_required
+# @role_required(['admin'])
+# def edit_product(id):
+    product = ProductCatalog.query.get_or_404(id)
     
     # Get form data
     product.name = request.form.get('name')
@@ -1214,7 +1560,7 @@ def edit_product(id):
     
     db.session.commit()
     
-    flash('Product updated successfully', 'success')
+    flash('ProductCatalog updated successfully', 'success')
     return redirect(url_for('products'))
 
 @app.route('/delete_product/<int:id>', methods=['POST'])
@@ -1222,7 +1568,7 @@ def edit_product(id):
 @role_required(['admin'])
 def delete_product(id):
     try:
-        product = Product.query.get_or_404(id)
+        product = ProductCatalog.query.get_or_404(id)
         
         # Check if product has related records
         if product.order_items or product.stock_transactions:
@@ -1239,7 +1585,7 @@ def delete_product(id):
         db.session.delete(product)
         db.session.commit()
         
-        flash('Product deleted successfully', 'success')
+        flash('ProductCatalog deleted successfully', 'success')
         return redirect(url_for('products'))
     except IntegrityError as e:
         db.session.rollback()
@@ -1251,11 +1597,11 @@ def delete_product(id):
         return redirect(url_for('products'))
 
 # Stock Management Routes
-@app.route('/add_stock/<int:product_id>', methods=['POST'])
+@app.route('/add_stock/<int:branch_product_id>', methods=['POST'])
 @login_required
 @role_required(['admin'])
-def add_stock(product_id):
-    product = Product.query.get_or_404(product_id)
+def add_stock(branch_product_id):
+    branch_product = BranchProduct.query.get_or_404(branch_product_id)
     
     # Get form data
     quantity = request.form.get('quantity')
@@ -1264,18 +1610,18 @@ def add_stock(product_id):
     # Basic validation
     if not quantity or not quantity.isdigit() or int(quantity) <= 0:
         flash('Please enter a valid positive quantity', 'error')
-        return redirect(url_for('products'))
+        return redirect(url_for('products', branch_id=branch_product.branchid))
     
     quantity = int(quantity)
-    previous_stock = product.stock or 0
+    previous_stock = branch_product.stock or 0
     new_stock = previous_stock + quantity
     
-    # Update product stock
-    product.stock = new_stock
+    # Update branch product stock
+    branch_product.stock = new_stock
     
     # Create stock transaction record
     stock_transaction = StockTransaction(
-        productid=product_id,
+        branch_productid=branch_product_id,
         userid=current_user.id,
         transaction_type='add',
         quantity=quantity,
@@ -1287,14 +1633,15 @@ def add_stock(product_id):
     db.session.add(stock_transaction)
     db.session.commit()
     
-    flash(f'Successfully added {quantity} units to {product.name}. New stock: {new_stock}', 'success')
-    return redirect(url_for('products'))
+    product_name = branch_product.catalog_product.name if branch_product.catalog_product else 'Unknown ProductCatalog'
+    flash(f'Successfully added {quantity} units to {product_name}. New stock: {new_stock}', 'success')
+    return redirect(url_for('products', branch_id=branch_product.branchid))
 
-@app.route('/remove_stock/<int:product_id>', methods=['POST'])
+@app.route('/remove_stock/<int:branch_product_id>', methods=['POST'])
 @login_required
 @role_required(['admin'])
-def remove_stock(product_id):
-    product = Product.query.get_or_404(product_id)
+def remove_stock(branch_product_id):
+    branch_product = BranchProduct.query.get_or_404(branch_product_id)
     
     # Get form data
     quantity = request.form.get('quantity')
@@ -1303,24 +1650,24 @@ def remove_stock(product_id):
     # Basic validation
     if not quantity or not quantity.isdigit() or int(quantity) <= 0:
         flash('Please enter a valid positive quantity', 'error')
-        return redirect(url_for('products'))
+        return redirect(url_for('products', branch_id=branch_product.branchid))
     
     quantity = int(quantity)
-    previous_stock = product.stock or 0
+    previous_stock = branch_product.stock or 0
     
     # Check if we have enough stock
     if previous_stock < quantity:
         flash(f'Insufficient stock. Current stock: {previous_stock}, trying to remove: {quantity}', 'error')
-        return redirect(url_for('products'))
+        return redirect(url_for('products', branch_id=branch_product.branchid))
     
     new_stock = previous_stock - quantity
     
-    # Update product stock
-    product.stock = new_stock
+    # Update branch product stock
+    branch_product.stock = new_stock
     
     # Create stock transaction record
     stock_transaction = StockTransaction(
-        productid=product_id,
+        branch_productid=branch_product_id,
         userid=current_user.id,
         transaction_type='remove',
         quantity=quantity,
@@ -1332,38 +1679,40 @@ def remove_stock(product_id):
     db.session.add(stock_transaction)
     db.session.commit()
     
-    flash(f'Successfully removed {quantity} units from {product.name}. New stock: {new_stock}', 'success')
-    return redirect(url_for('products'))
+    product_name = branch_product.catalog_product.name if branch_product.catalog_product else 'Unknown ProductCatalog'
+    flash(f'Successfully removed {quantity} units from {product_name}. New stock: {new_stock}', 'success')
+    return redirect(url_for('products', branch_id=branch_product.branchid))
 
-@app.route('/stock_history/<int:product_id>')
+@app.route('/stock_history/<int:branch_product_id>')
 @login_required
 @role_required(['admin'])
-def stock_history(product_id):
-    product = Product.query.get_or_404(product_id)
-    transactions = StockTransaction.query.filter_by(productid=product_id).order_by(StockTransaction.created_at.desc()).all()
+def stock_history(branch_product_id):
+    branch_product = BranchProduct.query.get_or_404(branch_product_id)
+    transactions = StockTransaction.query.filter_by(branch_productid=branch_product_id).order_by(StockTransaction.created_at.desc()).all()
     
     # Add adjusted times (3 hours ahead) for display
     for transaction in transactions:
         transaction.created_at_adjusted = transaction.created_at + timedelta(hours=3)
     
-    return render_template('stock_history.html', product=product, transactions=transactions)
+    return render_template('stock_history.html', branch_product=branch_product, transactions=transactions)
 
-@app.route('/toggle_display/<int:product_id>', methods=['POST'])
+@app.route('/toggle_display/<int:branch_product_id>', methods=['POST'])
 @login_required
 @role_required(['admin'])
-def toggle_display(product_id):
+def toggle_display(branch_product_id):
     try:
-        product = Product.query.get_or_404(product_id)
-        product.display = not product.display
+        branch_product = BranchProduct.query.get_or_404(branch_product_id)
+        branch_product.display = not branch_product.display
         db.session.commit()
         
-        status = "visible" if product.display else "hidden"
-        flash(f'Product "{product.name}" is now {status} in customer app', 'success')
-        return redirect(url_for('products'))
+        status = "visible" if branch_product.display else "hidden"
+        product_name = branch_product.catalog_product.name if branch_product.catalog_product else 'Unknown ProductCatalog'
+        flash(f'ProductCatalog "{product_name}" is now {status} in customer app', 'success')
+        return redirect(url_for('products', branch_id=branch_product.branchid))
     except Exception as e:
         db.session.rollback()
         flash('An error occurred while updating product display status', 'error')
-        return redirect(url_for('products'))
+        return redirect(url_for('products', branch_id=branch_product.branchid))
 
 # User Management Routes
 @app.route('/users')
@@ -1570,7 +1919,8 @@ def orders():
             db.joinedload(Order.user),
             db.joinedload(Order.ordertype),
             db.joinedload(Order.branch),
-            db.joinedload(Order.order_items).joinedload(OrderItem.product)
+            # Legacy product relationship removed - using branch_product only
+            db.joinedload(Order.order_items).joinedload(OrderItem.branch_product).joinedload(BranchProduct.catalog_product)
         )
         
         # Apply filters
@@ -1609,9 +1959,9 @@ def orders():
             
             if first_order.order_items:
                 first_item = first_order.order_items[0]
-                print(f"First item product: {first_item.product.name if first_item.product else 'No product'}")
+                print(f"First item product: {first_item.branch_product.catalog_product.name if first_item.branch_product and first_item.branch_product.catalog_product else 'No product'}")
                 print(f"First item final_price: {first_item.final_price}")
-                print(f"First item product sellingprice: {first_item.product.sellingprice if first_item.product else 'No product'}")
+                print(f"First item product sellingprice: {first_item.branch_product.sellingprice if first_item.branch_product else 'No product'}")
         
         # Calculate and update payment status for all orders
         for order in orders:
@@ -1627,11 +1977,11 @@ def orders():
                     item_total = item.final_price * item.quantity
                     total_amount += item_total
                     print(f"    Using final_price: {item.final_price} * {item.quantity} = {item_total}")
-                elif item.product and item.product.sellingprice:
-                    # Use product's selling price if no final_price but product relationship exists
-                    item_total = item.product.sellingprice * item.quantity
+                elif item.branch_product and item.branch_product.sellingprice:
+                    # Use branch product's selling price if no final_price but branch product relationship exists
+                    item_total = item.branch_product.sellingprice * item.quantity
                     total_amount += item_total
-                    print(f"    Using product.sellingprice: {item.product.sellingprice} * {item.quantity} = {item_total}")
+                    print(f"    Using branch_product.sellingprice: {item.branch_product.sellingprice} * {item.quantity} = {item_total}")
                 elif hasattr(item, 'product_name') and item.product_name:
                     # For manually entered items without product relationship, check if they have a price
                     if item.original_price:
@@ -1647,42 +1997,25 @@ def orders():
             # Store the calculated total on the order object for template use
             order.calculated_total = total_amount
             
-            # Calculate profit for the order
-            total_profit = 0
+            # Calculate profit for the order using OrderItem fields directly
+            order_profit = 0
             print(f"🔍 Calculating profit for order {order.id} with {len(order.order_items)} items")
             for item in order.order_items:
-                print(f"  📦 Item {item.id}: final_price={item.final_price}, product_id={item.productid}")
+                print(f"  📦 Item {item.id}: final_price={item.final_price}, buying_price={item.buying_price}")
                 
-                if item.final_price:
-                    print(f"    ✅ Has final_price: {item.final_price}")
-                    # For items with final_price, calculate profit if we have buying price
-                    if item.product and item.product.buyingprice:
-                        item_profit = (item.final_price - item.product.buyingprice) * item.quantity
-                        total_profit += item_profit
-                        print(f"      💰 Product profit: ({item.final_price} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
-                    elif hasattr(item, 'buying_price') and item.buying_price:
-                        item_profit = (item.final_price - item.buying_price) * item.quantity
-                        total_profit += item_profit
-                        print(f"      💰 Manual item profit: ({item.final_price} - {item.buying_price}) × {item.quantity} = {item_profit}")
-                    else:
-                        print(f"      ⚠️ No buying price available for item with final_price")
-                elif item.product and item.product.sellingprice and item.product.buyingprice:
-                    # For items using product selling price, calculate profit
-                    item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
-                    total_profit += item_profit
-                    print(f"    📊 Product prices profit: ({item.product.sellingprice} - {item.product.buyingprice}) × {item.quantity} = {item_profit}")
+                # Use final_price as selling price and buying_price from OrderItem table
+                if item.final_price and item.buying_price:
+                    item_profit = (item.final_price - item.buying_price) * item.quantity
+                    order_profit += item_profit
+                    print(f"    💰 Profit: ({item.final_price} - {item.buying_price}) × {item.quantity} = {item_profit}")
                 else:
                     print(f"    ⚠️ Cannot calculate profit - missing price data")
-                    if item.product:
-                        print(f"      Product: buyingprice={item.product.buyingprice}, sellingprice={item.product.sellingprice}")
-                    if hasattr(item, 'buying_price'):
-                        print(f"      Item buying_price: {item.buying_price}")
-                    if hasattr(item, 'original_price'):
-                        print(f"      Item original_price: {item.original_price}")
+                    print(f"      final_price: {item.final_price}")
+                    print(f"      buying_price: {item.buying_price}")
             
             # Store the calculated profit on the order object for template use
-            order.calculated_profit = total_profit
-            print(f"🔍 Order {order.id}: calculated_profit = {total_profit}")
+            order.calculated_profit = order_profit
+            print(f"🔍 Order {order.id}: calculated_profit = {order_profit}")
             
             # Calculate total payments received
             total_payments = Decimal('0')
@@ -1718,13 +2051,105 @@ def orders():
         # Get filter options
         branches = Branch.query.order_by(Branch.name).all()
         
+        # Calculate order statistics (using the same filters as the main query)
+        stats_query = db.session.query(Order)
+        
+        # Apply the same filters for statistics
+        if status_filter:
+            if status_filter == 'approved':
+                stats_query = stats_query.filter(Order.approvalstatus == True)
+            elif status_filter == 'pending':
+                stats_query = stats_query.filter(Order.approvalstatus == False)
+        
+        if payment_filter:
+            stats_query = stats_query.filter(Order.payment_status == payment_filter)
+        
+        if branch_filter:
+            stats_query = stats_query.filter(Order.branchid == branch_filter)
+        
+        # Calculate statistics
+        total_orders = stats_query.count()
+        paid_orders = stats_query.filter(Order.payment_status == 'paid').count()
+        pending_orders = stats_query.filter(Order.approvalstatus == False).count()
+        
+        # Calculate total revenue (only from paid orders)
+        total_revenue = db.session.query(
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
+        ).join(Order, OrderItem.orderid == Order.id).filter(
+            Order.payment_status.in_(['paid', 'partially_paid']),
+            OrderItem.final_price.isnot(None)
+        )
+        
+        # Apply same filters to revenue calculation
+        if status_filter:
+            if status_filter == 'approved':
+                total_revenue = total_revenue.filter(Order.approvalstatus == True)
+            elif status_filter == 'pending':
+                total_revenue = total_revenue.filter(Order.approvalstatus == False)
+        
+        if branch_filter:
+            total_revenue = total_revenue.filter(Order.branchid == branch_filter)
+        
+        total_revenue = total_revenue.scalar() or 0.0
+        
+        # Calculate profit statistics
+        # Total profit calculation (all time)
+        total_profit_query = db.session.query(
+            db.func.sum((OrderItem.final_price - OrderItem.buying_price) * OrderItem.quantity)
+        ).join(Order, OrderItem.orderid == Order.id).filter(
+            Order.payment_status.in_(['paid', 'partially_paid']),
+            OrderItem.final_price.isnot(None),
+            OrderItem.buying_price.isnot(None)
+        )
+        
+        # Apply same filters to profit calculation
+        if status_filter:
+            if status_filter == 'approved':
+                total_profit_query = total_profit_query.filter(Order.approvalstatus == True)
+            elif status_filter == 'pending':
+                total_profit_query = total_profit_query.filter(Order.approvalstatus == False)
+        
+        if branch_filter:
+            total_profit_query = total_profit_query.filter(Order.branchid == branch_filter)
+        
+        total_profit = total_profit_query.scalar() or 0.0
+        
+        # Monthly profit calculation (current month)
+        current_month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        monthly_profit_query = db.session.query(
+            db.func.sum((OrderItem.final_price - OrderItem.buying_price) * OrderItem.quantity)
+        ).join(Order, OrderItem.orderid == Order.id).filter(
+            Order.payment_status.in_(['paid', 'partially_paid']),
+            OrderItem.final_price.isnot(None),
+            OrderItem.buying_price.isnot(None),
+            Order.created_at >= current_month_start
+        )
+        
+        # Apply same filters to monthly profit calculation
+        if status_filter:
+            if status_filter == 'approved':
+                monthly_profit_query = monthly_profit_query.filter(Order.approvalstatus == True)
+            elif status_filter == 'pending':
+                monthly_profit_query = monthly_profit_query.filter(Order.approvalstatus == False)
+        
+        if branch_filter:
+            monthly_profit_query = monthly_profit_query.filter(Order.branchid == branch_filter)
+        
+        monthly_profit = monthly_profit_query.scalar() or 0.0
+        
         return render_template('orders.html', 
                              orders=orders, 
                              pagination=pagination,
                              branches=branches,
                              status_filter=status_filter,
                              payment_filter=payment_filter,
-                             branch_filter=branch_filter)
+                             branch_filter=branch_filter,
+                             total_orders=total_orders,
+                             paid_orders=paid_orders,
+                             pending_orders=pending_orders,
+                             total_revenue=float(total_revenue),
+                             total_profit=float(total_profit),
+                             monthly_profit=float(monthly_profit))
     except Exception as e:
         print(f"Error in orders route: {e}")
         db.session.rollback()
@@ -1738,25 +2163,17 @@ def order_details(order_id):
     try:
         order = Order.query.get_or_404(order_id)
         
-        # Calculate order total and profit
+        # Calculate order total and profit using OrderItem fields directly
         total_amount = 0
-        total_profit = 0
+        order_profit = 0
         for item in order.order_items:
             if item.final_price:
                 total_amount += item.final_price * item.quantity
-                # Calculate profit for items with final_price
-                if item.product and item.product.buyingprice:
-                    item_profit = (item.final_price - item.product.buyingprice) * item.quantity
-                    total_profit += item_profit
-                elif hasattr(item, 'buying_price') and item.buying_price:
-                    item_profit = (item.final_price - item.buying_price) * item.quantity
-                    total_profit += item_profit
-            elif item.product and item.product.sellingprice:
-                total_amount += item.product.sellingprice * item.quantity
-                # Calculate profit for items using product selling price
-                if item.product.buyingprice:
-                    item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity
-                    total_profit += item_profit
+                
+            # Calculate profit using final_price and buying_price from OrderItem table
+            if item.final_price and item.buying_price:
+                item_profit = (item.final_price - item.buying_price) * item.quantity
+                order_profit += item_profit
         
         # Calculate payment status based on actual payments received
         total_payments = Decimal('0')
@@ -1792,7 +2209,7 @@ def order_details(order_id):
         for payment in order.payments:
             payment.created_at_adjusted = payment.created_at + timedelta(hours=3)
         
-        return render_template('order_details.html', order=order, total_amount=total_amount, total_payments=total_payments, payment_status=payment_status, total_profit=total_profit)
+        return render_template('order_details.html', order=order, total_amount=total_amount, total_payments=total_payments, payment_status=payment_status, total_profit=order_profit)
     except Exception as e:
         print(f"Error in order details route: {e}")
         flash('An error occurred while loading order details.', 'error')
@@ -1853,9 +2270,10 @@ def profit_loss():
         end_dt = datetime.strptime(end_date, '%Y-%m-%d')
         
         # Calculate Revenue (from completed orders)
+        # Use BranchProduct for new orders, fallback to ProductCatalog for legacy orders
         revenue_query = db.session.query(
             db.func.sum(OrderItem.quantity * OrderItem.final_price)
-        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+        ).select_from(OrderItem).outerjoin(BranchProduct, OrderItem.branch_productid == BranchProduct.id).outerjoin(ProductCatalog, OrderItem.productid == ProductCatalog.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
             Order.payment_status.in_(['paid', 'partially_paid']),
@@ -1865,9 +2283,10 @@ def profit_loss():
         total_revenue = revenue_query.scalar() or 0
         
         # Calculate Cost of Goods Sold (COGS)
+        # Use BranchProduct buying price for new orders, fallback to ProductCatalog for legacy orders
         cogs_query = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.buyingprice)
-        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+            db.func.sum(OrderItem.quantity * db.func.coalesce(BranchProduct.buyingprice, ProductCatalog.buyingprice, 0))
+        ).select_from(OrderItem).outerjoin(BranchProduct, OrderItem.branch_productid == BranchProduct.id).outerjoin(ProductCatalog, OrderItem.productid == ProductCatalog.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
             Order.payment_status.in_(['paid', 'partially_paid']),
@@ -1917,31 +2336,44 @@ def profit_loss():
         ).count()
         
         # Get top selling products
+        # Use BranchProduct for new orders, fallback to ProductCatalog for legacy orders
         top_products = db.session.query(
-            Product.name,
+            db.func.coalesce(ProductCatalog.name, ProductCatalog.name).label('product_name'),
             db.func.sum(OrderItem.quantity).label('total_quantity'),
             db.func.sum(OrderItem.quantity * OrderItem.final_price).label('total_revenue')
-        ).select_from(Product).join(OrderItem, Product.id == OrderItem.productid).join(
+        ).select_from(OrderItem).outerjoin(BranchProduct, OrderItem.branch_productid == BranchProduct.id).outerjoin(ProductCatalog, BranchProduct.catalog_id == ProductCatalog.id).outerjoin(ProductCatalog, OrderItem.productid == ProductCatalog.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
             Order.payment_status.in_(['paid', 'partially_paid']),
             Order.created_at >= start_dt,
             Order.created_at <= end_dt
-        ).group_by(Product.id, Product.name).order_by(
+        ).group_by(db.func.coalesce(ProductCatalog.name, ProductCatalog.name)).order_by(
             db.func.sum(OrderItem.quantity).desc()
         ).limit(10).all()
         
         # Top products by asset value (buying price * stock)
         top_products_by_asset_value = db.session.query(
-            Product, (Product.buyingprice * Product.stock).label('asset_value')
+            ProductCatalog, (ProductCatalog.buyingprice * ProductCatalog.stock).label('asset_value')
         ).filter(
             and_(
-                Product.buyingprice.isnot(None),
-                Product.buyingprice > 0,
-                Product.stock.isnot(None),
-                Product.stock > 0
+                ProductCatalog.buyingprice.isnot(None),
+                ProductCatalog.buyingprice > 0,
+                ProductCatalog.stock.isnot(None),
+                ProductCatalog.stock > 0
             )
-        ).order_by((Product.buyingprice * Product.stock).desc()).limit(5).all()
+        ).order_by((ProductCatalog.buyingprice * ProductCatalog.stock).desc()).limit(5).all()
+        
+        # Calculate total product asset for percentage calculation
+        total_product_asset = db.session.query(
+            func.sum(BranchProduct.buyingprice * BranchProduct.stock)
+        ).filter(
+            and_(
+                BranchProduct.buyingprice.isnot(None),
+                BranchProduct.buyingprice > 0,
+                BranchProduct.stock.isnot(None),
+                BranchProduct.stock > 0
+            )
+        ).scalar() or 0
         
         # Calculate percentage of total assets for each top product
         top_products_with_percentage = []
@@ -1992,14 +2424,17 @@ def balance_sheet():
         
         # Calculate Assets
         # Inventory Value (current stock * buying price)
+        # Use BranchProduct for new inventory, fallback to ProductCatalog for legacy inventory
         inventory_value = db.session.query(
-            db.func.sum(Product.stock * Product.buyingprice)
-        ).filter(Product.stock > 0).scalar() or 0
+            db.func.sum(db.func.coalesce(BranchProduct.stock * BranchProduct.buyingprice, ProductCatalog.stock * ProductCatalog.buyingprice, 0))
+        ).outerjoin(BranchProduct, True).outerjoin(ProductCatalog, True).filter(
+            db.or_(BranchProduct.stock > 0, ProductCatalog.stock > 0)
+        ).scalar() or 0
         
         # Accounts Receivable (pending payments)
         accounts_receivable = db.session.query(
             db.func.sum(OrderItem.quantity * OrderItem.final_price)
-        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+        ).select_from(OrderItem).outerjoin(BranchProduct, OrderItem.branch_productid == BranchProduct.id).outerjoin(ProductCatalog, OrderItem.productid == ProductCatalog.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
             Order.payment_status == 'pending',
@@ -2024,7 +2459,7 @@ def balance_sheet():
         # Retained Earnings (simplified calculation)
         total_revenue = db.session.query(
             db.func.sum(OrderItem.quantity * OrderItem.final_price)
-        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+        ).select_from(OrderItem).outerjoin(BranchProduct, OrderItem.branch_productid == BranchProduct.id).outerjoin(ProductCatalog, OrderItem.productid == ProductCatalog.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
             Order.payment_status.in_(['paid', 'partially_paid']),
@@ -2032,8 +2467,8 @@ def balance_sheet():
         ).scalar() or 0
         
         total_cogs = db.session.query(
-            db.func.sum(OrderItem.quantity * Product.buyingprice)
-        ).select_from(OrderItem).join(Product, OrderItem.productid == Product.id).join(
+            db.func.sum(OrderItem.quantity * db.func.coalesce(BranchProduct.buyingprice, ProductCatalog.buyingprice, 0))
+        ).select_from(OrderItem).outerjoin(BranchProduct, OrderItem.branch_productid == BranchProduct.id).outerjoin(ProductCatalog, OrderItem.productid == ProductCatalog.id).join(
             Order, OrderItem.orderid == Order.id
         ).filter(
             Order.payment_status.in_(['paid', 'partially_paid']),
@@ -2056,10 +2491,10 @@ def balance_sheet():
         # Get inventory breakdown by category
         inventory_by_category = db.session.query(
             Category.name,
-            db.func.sum(Product.stock * Product.buyingprice).label('value')
+            db.func.sum(ProductCatalog.stock * ProductCatalog.buyingprice).label('value')
         ).select_from(Category).join(SubCategory, Category.id == SubCategory.category_id).join(
-            Product, SubCategory.id == Product.subcategory_id
-        ).filter(Product.stock > 0).group_by(Category.id, Category.name).all()
+            ProductCatalog, SubCategory.id == ProductCatalog.subcategory_id
+        ).filter(ProductCatalog.stock > 0).group_by(Category.id, Category.name).all()
         
         # Get recent transactions
         recent_transactions = db.session.query(
@@ -2097,7 +2532,7 @@ def branches():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         
-        # Get all branches with pagination
+        # Get branches with simple pagination
         pagination = Branch.query.paginate(
             page=page, 
             per_page=per_page, 
@@ -2107,57 +2542,39 @@ def branches():
         branches = pagination.items
         print(f"Branches found: {len(branches)}")
         
-        # Update payment status for all orders in all branches
-        for branch in branches:
-            print(f"Processing branch: {branch.name} with {len(branch.orders)} orders")
-            
-            for order in branch.orders:
-                print(f"  Order {order.id}: payment_status={order.payment_status}, items={len(order.order_items)}")
-                
-                # Calculate order total
-                total_amount = 0
-                for item in order.order_items:
-                    if item.final_price:
-                        total_amount += item.final_price * item.quantity
-                    elif item.product and item.product.sellingprice:
-                        total_amount += item.product.sellingprice * item.quantity
-                
-                # Calculate total payments received
-                total_payments = Decimal('0')
-                for payment in order.payments:
-                    if payment.payment_status == 'completed':
-                        total_payments += Decimal(str(payment.amount))
-                
-                print(f"    Total amount: {total_amount}, Total payments: {total_payments}")
-                
-                # Determine payment status
-                if total_payments >= total_amount:
-                    payment_status = 'paid'
-                elif total_payments > 0:
-                    payment_status = 'partially_paid'
-                else:
-                    payment_status = 'not_paid'
-                
-                print(f"    Calculated status: {payment_status}")
-                
-                # Update the order's payment_status field if it's different
-                if order.payment_status != payment_status:
-                    order.payment_status = payment_status
-                    print(f"    Updated status from {order.payment_status} to {payment_status}")
-            
-            print(f"Branch {branch.name} revenue: {branch.revenue}")
-            print(f"  - Orders: {len(branch.orders)}")
-            for order in branch.orders:
-                print(f"    Order {order.id}: {len(order.payments)} payments")
-                for payment in order.payments:
-                    print(f"      Payment {payment.id}: {payment.amount} ({payment.payment_status})")
+        # Get branch statistics in bulk queries for better performance
+        branch_ids = [branch.id for branch in branches]
         
-        # Commit all payment status updates
-        try:
-            db.session.commit()
-        except Exception as e:
-            print(f"Error updating payment statuses: {e}")
-            db.session.rollback()
+        # Get product counts for all branches in one query
+        product_counts = db.session.query(
+            BranchProduct.branchid,
+            db.func.count(BranchProduct.id).label('product_count')
+        ).filter(BranchProduct.branchid.in_(branch_ids)).group_by(BranchProduct.branchid).all()
+        product_count_dict = {bid: count for bid, count in product_counts}
+        
+        # Get order counts for all branches in one query
+        order_counts = db.session.query(
+            Order.branchid,
+            db.func.count(Order.id).label('order_count')
+        ).filter(Order.branchid.in_(branch_ids)).group_by(Order.branchid).all()
+        order_count_dict = {bid: count for bid, count in order_counts}
+        
+        # Get revenue for all branches in one efficient query
+        revenue_data = db.session.query(
+            Order.branchid,
+            db.func.sum(OrderItem.quantity * OrderItem.final_price).label('revenue')
+        ).join(OrderItem, Order.id == OrderItem.orderid).filter(
+            Order.branchid.in_(branch_ids),
+            Order.payment_status.in_(['paid', 'partially_paid']),
+            OrderItem.final_price.isnot(None)
+        ).group_by(Order.branchid).all()
+        revenue_dict = {bid: float(revenue) if revenue else 0.0 for bid, revenue in revenue_data}
+        
+        # Add calculated attributes to branch objects
+        for branch in branches:
+            branch.product_count = product_count_dict.get(branch.id, 0)
+            branch.order_count = order_count_dict.get(branch.id, 0)
+            branch.revenue = revenue_dict.get(branch.id, 0.0)
         
         return render_template('branches.html', branches=branches, pagination=pagination)
     except Exception as e:
@@ -2181,8 +2598,7 @@ def debug_payment_status():
             for item in order.order_items:
                 if item.final_price:
                     total_amount += item.final_price * item.quantity
-                elif item.product and item.product.sellingprice:
-                    total_amount += item.product.sellingprice * item.quantity
+                # Legacy product relationship removed - using branch_product only
             
             # Calculate total payments received
             total_payments = Decimal('0')
@@ -2222,11 +2638,21 @@ def debug_branches_revenue():
         debug_info = []
         
         for branch in branches:
+            # Calculate branch revenue
+            branch_revenue = 0
+            for order in branch.orders:
+                if order.payment_status in ['paid', 'partially_paid']:
+                    for item in order.order_items:
+                        if item.final_price:
+                            branch_revenue += float(item.final_price * item.quantity)
+                        elif item.branch_product and item.branch_product.sellingprice:
+                            branch_revenue += float(item.branch_product.sellingprice * item.quantity)
+            
             branch_data = {
                 'branch_id': branch.id,
                 'branch_name': branch.name,
                 'orders_count': len(branch.orders),
-                'revenue': float(branch.revenue),
+                'revenue': branch_revenue,
                 'orders': []
             }
             
@@ -2340,7 +2766,7 @@ def delete_branch(id):
         branch = Branch.query.get_or_404(id)
         
         # Check if branch has related records
-        if branch.products or branch.orders:
+        if branch.branch_products or branch.orders:
             flash('Cannot delete this branch. It has associated products or orders.', 'error')
             return redirect(url_for('branches'))
         
@@ -2366,21 +2792,22 @@ def branch_details(branch_id):
         branch = Branch.query.get_or_404(branch_id)
         
         # Get branch statistics
-        total_products = Product.query.filter_by(branchid=branch_id).count()
+        total_products = BranchProduct.query.filter_by(branchid=branch_id).count()
         total_orders = Order.query.filter_by(branchid=branch_id).count()
         
         # Get recent orders for this branch
         recent_orders = Order.query.filter_by(branchid=branch_id).order_by(Order.created_at.desc()).limit(10).all()
         
-        # Get products in this branch
-        products = Product.query.filter_by(branchid=branch_id).all()
+        # Get only a limited number of products for display (for performance)
+        products = BranchProduct.query.filter_by(branchid=branch_id).limit(20).all()
         
-        # Calculate branch revenue
+        # Calculate branch revenue using the same efficient method as branches page
         branch_revenue = db.session.query(
             db.func.sum(OrderItem.quantity * OrderItem.final_price)
-        ).join(Product).join(Order).filter(
+        ).join(Order, OrderItem.orderid == Order.id).filter(
             Order.branchid == branch_id,
-            Order.payment_status.in_(['paid', 'partially_paid'])
+            Order.payment_status.in_(['paid', 'partially_paid']),
+            OrderItem.final_price.isnot(None)
         ).scalar() or 0
         
         return render_template('branch_details.html', 
@@ -2430,14 +2857,14 @@ def categories():
                 # Get product counts for all categories in one query
                 product_counts = db.session.query(
                     SubCategory.category_id,
-                    db.func.count(Product.id).label('product_count')
+                    db.func.count(ProductCatalog.id).label('product_count')
                 ).select_from(SubCategory).outerjoin(
-                    Product, SubCategory.id == Product.subcategory_id
+                    ProductCatalog, SubCategory.id == ProductCatalog.subcategory_id
                 ).filter(
                     SubCategory.category_id.in_(category_ids)
                 ).group_by(SubCategory.category_id).all()
                 
-                print(f"Product counts query result: {product_counts}")
+                print(f"ProductCatalog counts query result: {product_counts}")
                 
                 # Convert to dictionary for easy lookup
                 product_count_dict = {cat_id: count for cat_id, count in product_counts}
@@ -2447,9 +2874,9 @@ def categories():
                     SubCategory.category_id,
                     db.func.sum(OrderItem.quantity * OrderItem.final_price).label('revenue')
                 ).select_from(SubCategory).join(
-                    Product, SubCategory.id == Product.subcategory_id
+                    ProductCatalog, SubCategory.id == ProductCatalog.subcategory_id
                 ).join(
-                    OrderItem, Product.id == OrderItem.productid
+                    OrderItem, ProductCatalog.id == OrderItem.productid
                 ).join(
                     Order, OrderItem.orderid == Order.id
                 ).filter(
@@ -2476,14 +2903,14 @@ def categories():
                     
                     if subcategory_ids:
                         # Count products
-                        product_count = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).count()
+                        product_count = ProductCatalog.query.filter(ProductCatalog.subcategory_id.in_(subcategory_ids)).count()
                         product_count_dict[category.id] = product_count
                         
                         # Calculate revenue
                         revenue = db.session.query(
                             db.func.sum(OrderItem.quantity * OrderItem.final_price)
-                        ).join(Product).join(Order).filter(
-                            Product.subcategory_id.in_(subcategory_ids),
+                        ).join(ProductCatalog).join(Order).filter(
+                            ProductCatalog.subcategory_id.in_(subcategory_ids),
                             Order.payment_status.in_(['paid', 'partially_paid']),
                             OrderItem.final_price.isnot(None)
                         ).scalar() or 0
@@ -2542,23 +2969,23 @@ def category_details(category_id):
         # Handle both old and new product structures
         if subcategory_ids:
             # New structure: products through subcategories
-            total_products = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).count()
-            products = Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).order_by(Product.id).all()
+            total_products = ProductCatalog.query.filter(ProductCatalog.subcategory_id.in_(subcategory_ids)).count()
+            products = ProductCatalog.query.filter(ProductCatalog.subcategory_id.in_(subcategory_ids)).order_by(ProductCatalog.id).all()
             
             # Calculate category revenue
             category_revenue = db.session.query(
                 db.func.sum(OrderItem.quantity * OrderItem.final_price)
-            ).join(Product).join(Order).filter(
-                Product.subcategory_id.in_(subcategory_ids),
+            ).join(ProductCatalog).join(Order).filter(
+                ProductCatalog.subcategory_id.in_(subcategory_ids),
                 Order.payment_status.in_(['paid', 'partially_paid'])
             ).scalar() or 0
             
             # Get products by branch
             products_by_branch = db.session.query(
                 Branch.name,
-                db.func.count(Product.id).label('product_count')
-            ).join(Product).filter(
-                Product.subcategory_id.in_(subcategory_ids)
+                db.func.count(ProductCatalog.id).label('product_count')
+            ).join(ProductCatalog).filter(
+                ProductCatalog.subcategory_id.in_(subcategory_ids)
             ).group_by(Branch.id, Branch.name).all()
         else:
             # No subcategories yet, show empty state
@@ -2759,25 +3186,25 @@ def subcategory_details(subcategory_id):
         subcategory = SubCategory.query.get_or_404(subcategory_id)
         
         # Get subcategory statistics
-        total_products = Product.query.filter_by(subcategory_id=subcategory_id).count()
+        total_products = ProductCatalog.query.filter_by(subcategory_id=subcategory_id).count()
         
         # Get products in this subcategory
-        products = Product.query.filter_by(subcategory_id=subcategory_id).all()
+        products = ProductCatalog.query.filter_by(subcategory_id=subcategory_id).all()
         
         # Calculate subcategory revenue
         subcategory_revenue = db.session.query(
             db.func.sum(OrderItem.quantity * OrderItem.final_price)
-        ).join(Product).join(Order).filter(
-            Product.subcategory_id == subcategory_id,
+        ).join(ProductCatalog).join(Order).filter(
+            ProductCatalog.subcategory_id == subcategory_id,
             Order.payment_status.in_(['paid', 'partially_paid'])
         ).scalar() or 0
         
         # Get products by branch
         products_by_branch = db.session.query(
             Branch.name,
-            db.func.count(Product.id).label('product_count')
-        ).join(Product).filter(
-            Product.subcategory_id == subcategory_id
+            db.func.count(ProductCatalog.id).label('product_count')
+        ).join(ProductCatalog).filter(
+            ProductCatalog.subcategory_id == subcategory_id
         ).group_by(Branch.id, Branch.name).all()
         
         return render_template('subcategory_details.html', 
@@ -2791,13 +3218,13 @@ def subcategory_details(subcategory_id):
         flash('An error occurred while loading subcategory details.', 'error')
         return redirect(url_for('subcategories'))
 
-# Product Description Management Routes
+# ProductCatalog Description Management Routes
 @app.route('/product_descriptions/<int:product_id>')
 @login_required
 @role_required(['admin'])
 def product_descriptions(product_id):
     try:
-        product = Product.query.get_or_404(product_id)
+        product = ProductCatalog.query.get_or_404(product_id)
         descriptions = ProductDescription.query.filter_by(
             product_id=product_id, is_active=True
         ).order_by(ProductDescription.sort_order, ProductDescription.created_at).all()
@@ -2818,7 +3245,7 @@ def product_descriptions(product_id):
 @login_required
 @role_required(['admin'])
 def add_product_description(product_id):
-    product = Product.query.get_or_404(product_id)
+    product = ProductCatalog.query.get_or_404(product_id)
     
     if request.method == 'POST':
         title = request.form.get('title')
@@ -2843,7 +3270,7 @@ def add_product_description(product_id):
         try:
             db.session.add(new_description)
             db.session.commit()
-            flash('Product description added successfully', 'success')
+            flash('ProductCatalog description added successfully', 'success')
             return redirect(url_for('product_descriptions', product_id=product_id))
         except Exception as e:
             db.session.rollback()
@@ -2879,7 +3306,7 @@ def edit_product_description(description_id):
         
         try:
             db.session.commit()
-            flash('Product description updated successfully', 'success')
+            flash('ProductCatalog description updated successfully', 'success')
             return redirect(url_for('product_descriptions', product_id=description.product_id))
         except Exception as e:
             db.session.rollback()
@@ -2899,7 +3326,7 @@ def delete_product_description(description_id):
         db.session.delete(description)
         db.session.commit()
         
-        flash('Product description deleted successfully', 'success')
+        flash('ProductCatalog description deleted successfully', 'success')
         return redirect(url_for('product_descriptions', product_id=product_id))
     except Exception as e:
         db.session.rollback()
@@ -3405,20 +3832,20 @@ def add_purchase_order():
             if items_data:
                 for item_data in items_data:
                     if item_data.strip():
-                        # Parse item data (format: product_code|product_name|quantity|notes)
+                        # Parse item data (format: product_code|product_name|quantity|unit)
                         parts = item_data.split('|')
                         if len(parts) >= 3:
                             product_code = parts[0].strip()
                             product_name = parts[1].strip() if len(parts) > 1 else ''
-                            quantity = int(parts[2].strip()) if parts[2].strip().isdigit() else 1
-                            notes = parts[3].strip() if len(parts) > 3 else ''
+                            quantity = float(parts[2].strip()) if parts[2].strip().replace('.', '').isdigit() else 1
+                            unit = parts[3].strip() if len(parts) > 3 else 'pieces'
                             
                             po_item = PurchaseOrderItem(
                                 purchase_order_id=new_po.id,
                                 product_code=product_code,
                                 product_name=product_name,
                                 quantity=quantity,
-                                notes=notes
+                                unit=unit
                             )
                             db.session.add(po_item)
                 
@@ -3434,7 +3861,7 @@ def add_purchase_order():
     
     suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
     branches = Branch.query.all()
-    products = Product.query.filter_by(display=True).order_by(Product.name).all()
+    products = ProductCatalog.query.order_by(ProductCatalog.name).all()
     
     return render_template('add_purchase_order.html', 
                          suppliers=suppliers, 
@@ -3515,12 +3942,12 @@ def edit_purchase_order(id):
             print(f"📋 Preparing data for template")
             suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
             branches = Branch.query.all()
-            products = Product.query.all()
+            products = ProductCatalog.query.all()
             
             print(f"✅ Data prepared:")
             print(f"   - Suppliers count: {len(suppliers)}")
             print(f"   - Branches count: {len(branches)}")
-            print(f"   - Products count: {len(products)}")
+            print(f"   - ProductCatalogs count: {len(products)}")
             
             # Check if template exists
             import os
@@ -3543,8 +3970,8 @@ def edit_purchase_order(id):
                 for i, item in enumerate(po.items):
                     print(f"   - Item {i+1}:")
                     print(f"     * ID: {item.id}")
-                    print(f"     * Product Name: {item.product_name}")
-                    print(f"     * Product Code: {item.product_code}")
+                    print(f"     * ProductCatalog Name: {item.product_name}")
+                    print(f"     * ProductCatalog Code: {item.product_code}")
                     print(f"     * Quantity: {item.quantity}")
                     print(f"     * Unit Price: {item.unit_price}")
                     print(f"     * Total Price: {item.total_price}")
@@ -3598,9 +4025,9 @@ def test_db_connection():
         branch_count = Branch.query.count()
         print(f"✅ Branch model working. Total branches: {branch_count}")
         
-        # Test Product model
-        product_count = Product.query.count()
-        print(f"✅ Product model working. Total products: {product_count}")
+        # Test ProductCatalog model
+        product_count = ProductCatalog.query.count()
+        print(f"✅ ProductCatalog model working. Total products: {product_count}")
         
         # Check if PO with ID 1 exists
         po_1 = PurchaseOrder.query.get(1)
@@ -3735,15 +4162,15 @@ def edit_po_item(item_id):
                 product_code = request.form.get('product_code', '').strip()
                 product_name = request.form.get('product_name', '').strip()
                 quantity = request.form.get('quantity')
+                unit = request.form.get('unit', 'pieces')
                 unit_price = request.form.get('unit_price')
-                notes = request.form.get('notes')
                 
                 print(f"📝 Form data received:")
                 print(f"   - product_code: {product_code}")
                 print(f"   - product_name: {product_name}")
                 print(f"   - quantity: {quantity}")
+                print(f"   - unit: {unit}")
                 print(f"   - unit_price: {unit_price}")
-                print(f"   - notes: {notes}")
                 
                 # At least one of product name or product code must be provided, plus quantity
                 if (not product_code and not product_name) or not quantity:
@@ -3772,8 +4199,8 @@ def edit_po_item(item_id):
                 po_item.product_code = product_code
                 po_item.product_name = product_name
                 po_item.quantity = quantity
+                po_item.unit = unit
                 po_item.unit_price = unit_price
-                po_item.notes = notes
                 
                 # Calculate total price if unit price is provided
                 if unit_price:
@@ -4021,12 +4448,12 @@ def export_purchase_order_pdf(po_id):
         if po.items:
             elements.append(Paragraph("ITEMS ORDERED", heading_style))
             
-            # Table data - Product Code, Product Name, Quantity
-            data = [['Product Code', 'Product Name', 'Quantity']]
+            # Table data - Product (Name - Code), Quantity
+            data = [['Product', 'Quantity']]
             
             # Create a style for product names that allows wrapping
             product_name_style = ParagraphStyle(
-                'ProductName',
+                'ProductCatalogName',
                 parent=styles['Normal'],
                 fontSize=11,
                 spaceAfter=0,
@@ -4050,18 +4477,34 @@ def export_purchase_order_pdf(po_id):
                     except (ValueError, TypeError):
                         formatted_quantity = str(item.quantity)
                 
-                # Format product name and code separately
+                # Format product name and code combined
                 product_name = item.product_name or ''
                 product_code = item.product_code or ''
+                unit = item.unit
+                
+                # Combine product name and code
+                if product_name and product_code:
+                    product_display = f"{product_name} - {product_code}"
+                elif product_name:
+                    product_display = product_name
+                elif product_code:
+                    product_display = product_code
+                else:
+                    product_display = 'N/A'
+                
+                # Combine quantity and unit (show unit only if it's explicitly set and not null)
+                if unit and unit.strip():
+                    quantity_unit_display = f"{formatted_quantity} {unit.upper()}"
+                else:
+                    quantity_unit_display = formatted_quantity
                 
                 data.append([
-                    Paragraph(product_code.upper(), product_name_style),
-                    Paragraph(product_name.upper(), product_name_style),
-                    formatted_quantity
+                    Paragraph(product_display.upper(), product_name_style),
+                    quantity_unit_display
                 ])
             
-            # Create table with 3 columns
-            table = Table(data, colWidths=[2*inch, 4*inch, 1.5*inch])
+            # Create table with 2 columns
+            table = Table(data, colWidths=[5*inch, 2*inch])
             table.setStyle(TableStyle([
                 # Header row
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
@@ -4080,9 +4523,8 @@ def export_purchase_order_pdf(po_id):
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
                 
                 # Alignment adjustments
-                ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Product Code center
-                ('ALIGN', (1, 1), (1, -1), 'LEFT'),    # Product Name left
-                ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # Quantity center
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Product (Name - Code) left
+                ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Quantity center
                 
                 # Padding
                 ('TOPPADDING', (0, 0), (-1, -1), 8),
@@ -4286,6 +4728,239 @@ def change_password():
             return redirect(url_for('change_password'))
     
     return render_template('change_password.html')
+
+# Sales Report Route - Matching abz-cashier-portal structure
+@app.route('/sales_report')
+@login_required
+@role_required(['admin'])
+def sales_report():
+    from datetime import datetime, timedelta
+    
+    # Get date range and branch filter from query parameters
+    start_date = request.args.get('start_date', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    end_date = request.args.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+    branch_id = request.args.get('branch_id', type=int)
+    
+    # Convert to datetime objects
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+    end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+    
+    # Get sales data
+    sales_data_query = db.session.query(
+        func.date(Payment.created_at).label('date'),
+        func.count(Payment.id).label('payment_count'),
+        func.sum(Payment.amount).label('total_amount')
+    ).join(Order, Payment.orderid == Order.id).filter(
+        Payment.payment_status == 'completed',
+        Payment.created_at >= start_dt,
+        Payment.created_at < end_dt
+    )
+    
+    # Apply branch filter if specified
+    if branch_id:
+        sales_data_query = sales_data_query.filter(Order.branchid == branch_id)
+    
+    sales_data = sales_data_query.group_by(func.date(Payment.created_at)).order_by(func.date(Payment.created_at)).all()
+    
+    # Get daily profit data separately to avoid join conflicts
+    daily_profits_query = db.session.query(
+        func.date(Payment.created_at).label('date'),
+        func.sum((OrderItem.final_price - OrderItem.buying_price) * OrderItem.quantity).label('daily_profit')
+    ).select_from(Payment).join(Order, Payment.orderid == Order.id).join(
+        OrderItem, Order.id == OrderItem.orderid
+    ).filter(
+        Payment.payment_status == 'completed',
+        Payment.created_at >= start_dt,
+        Payment.created_at < end_dt,
+        OrderItem.final_price.isnot(None),
+        OrderItem.buying_price.isnot(None)
+    )
+    
+    # Apply branch filter if specified
+    if branch_id:
+        daily_profits_query = daily_profits_query.filter(Order.branchid == branch_id)
+    
+    daily_profits = daily_profits_query.group_by(func.date(Payment.created_at)).all()
+    
+    # Create a dictionary for quick profit lookup
+    profit_dict = {row.date: row.daily_profit for row in daily_profits}
+    
+    # Create enhanced sales data with profit information
+    enhanced_sales_data = []
+    for row in sales_data:
+        enhanced_sales_data.append({
+            'date': row.date,
+            'payment_count': row.payment_count,
+            'total_amount': row.total_amount,
+            'total_profit': profit_dict.get(row.date, 0.0)
+        })
+    
+    # Calculate totals
+    total_revenue = sum(row.total_amount for row in sales_data if row.total_amount)
+    total_payments = sum(row.payment_count for row in sales_data)
+    
+    # Calculate total profit
+    total_profit_query = db.session.query(
+        db.func.sum((OrderItem.final_price - OrderItem.buying_price) * OrderItem.quantity)
+    ).join(Order, OrderItem.orderid == Order.id).join(
+        Payment, Order.id == Payment.orderid
+    ).filter(
+        Payment.payment_status == 'completed',
+        Payment.created_at >= start_dt,
+        Payment.created_at < end_dt,
+        OrderItem.final_price.isnot(None),
+        OrderItem.buying_price.isnot(None)
+    )
+    
+    # Apply branch filter if specified
+    if branch_id:
+        total_profit_query = total_profit_query.filter(Order.branchid == branch_id)
+    
+    total_profit = total_profit_query.scalar() or 0.0
+    
+    # Get all branches for dropdown
+    branches = Branch.query.all()
+    
+    # Get selected branch info
+    selected_branch = None
+    if branch_id:
+        selected_branch = Branch.query.get(branch_id)
+    
+    return render_template('sales_report.html', 
+                         sales_data=enhanced_sales_data,
+                         start_date=start_date,
+                         end_date=end_date,
+                         total_revenue=total_revenue,
+                         total_payments=total_payments,
+                         total_profit=float(total_profit),
+                         branches=branches,
+                         selected_branch=selected_branch,
+                         current_branch_id=branch_id)
+
+@app.route('/sales_report/daily-details/<date>')
+@login_required
+@role_required(['admin'])
+def daily_sales_details(date):
+    """Show detailed breakdown of sales for a specific date"""
+    try:
+        # Convert date string to datetime
+        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        next_day = date_obj + timedelta(days=1)
+        
+        # Get payments for the specific date
+        payments = db.session.query(Payment).join(Order).filter(
+            Payment.payment_status == 'completed',
+            Payment.created_at >= date_obj,
+            Payment.created_at < next_day
+        ).all()
+        
+        # Get order items for the specific date
+        order_items = db.session.query(OrderItem).join(Order).filter(
+            Order.created_at >= date_obj,
+            Order.created_at < next_day,
+            Order.payment_status.in_(['paid', 'partially_paid'])
+        ).all()
+        
+        # Calculate totals
+        total_revenue = sum(payment.amount for payment in payments)
+        total_payments = len(payments)
+        total_items = sum(item.quantity for item in order_items)
+        
+        return render_template('daily_sales_details.html',
+                             date=date_obj,
+                             payments=payments,
+                             order_items=order_items,
+                             total_revenue=total_revenue,
+                             total_payments=total_payments,
+                             total_items=total_items)
+        
+    except Exception as e:
+        print(f"Error in daily sales details: {e}")
+        flash('An error occurred while loading daily sales details.', 'error')
+        return redirect(url_for('sales_report'))
+
+@app.route('/delete_payment', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_payment():
+    """Delete a payment from an order"""
+    try:
+        payment_id = request.form.get('payment_id', type=int)
+        order_id = request.form.get('order_id', type=int)
+        
+        if not payment_id or not order_id:
+            flash('Invalid payment or order ID.', 'error')
+            return redirect(url_for('orders'))
+        
+        # Get the payment
+        payment = Payment.query.get_or_404(payment_id)
+        
+        # Verify the payment belongs to the specified order
+        if payment.orderid != order_id:
+            flash('Payment does not belong to the specified order.', 'error')
+            return redirect(url_for('order_details', order_id=order_id))
+        
+        # Delete the payment
+        db.session.delete(payment)
+        db.session.commit()
+        
+        flash(f'Payment #{payment_id} has been successfully deleted.', 'success')
+        
+    except Exception as e:
+        print(f"Error deleting payment: {e}")
+        db.session.rollback()
+        flash('An error occurred while deleting the payment.', 'error')
+    
+    # Redirect back to the order details page
+    return redirect(url_for('order_details', order_id=order_id))
+
+@app.route('/edit_payment', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def edit_payment():
+    """Edit a payment in an order"""
+    try:
+        payment_id = request.form.get('payment_id', type=int)
+        order_id = request.form.get('order_id', type=int)
+        payment_method = request.form.get('payment_method')
+        amount = request.form.get('amount', type=float)
+        payment_status = request.form.get('payment_status')
+        reference_number = request.form.get('reference_number', '').strip()
+        
+        if not payment_id or not order_id or not payment_method or not amount or not payment_status:
+            flash('All required fields must be filled.', 'error')
+            return redirect(url_for('order_details', order_id=order_id))
+        
+        if amount <= 0:
+            flash('Amount must be greater than zero.', 'error')
+            return redirect(url_for('order_details', order_id=order_id))
+        
+        # Get the payment
+        payment = Payment.query.get_or_404(payment_id)
+        
+        # Verify the payment belongs to the specified order
+        if payment.orderid != order_id:
+            flash('Payment does not belong to the specified order.', 'error')
+            return redirect(url_for('order_details', order_id=order_id))
+        
+        # Update the payment
+        payment.payment_method = payment_method
+        payment.amount = amount
+        payment.payment_status = payment_status
+        payment.reference_number = reference_number if reference_number else None
+        payment.updated_at = datetime.now()
+        
+        db.session.commit()
+        
+        flash(f'Payment #{payment_id} has been successfully updated.', 'success')
+        
+    except Exception as e:
+        print(f"Error editing payment: {e}")
+        db.session.rollback()
+        flash('An error occurred while updating the payment.', 'error')
+    
+    # Redirect back to the order details page
+    return redirect(url_for('order_details', order_id=order_id))
 
 def migrate_existing_passwords():
     """Migrate existing plain text passwords to hashed passwords"""

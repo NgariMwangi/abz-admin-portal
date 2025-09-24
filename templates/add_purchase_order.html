@@ -265,10 +265,29 @@ function addItemRow() {
             </div>
             <div class="col-md-2">
                 <div class="mb-2">
-                    <label class="form-label small">Notes</label>
-                    <input type="text" class="form-control form-control-sm" 
-                           name="notes_${itemCounter}" 
-                           placeholder="Optional notes">
+                    <label class="form-label small">Unit</label>
+                    <select class="form-control form-control-sm" 
+                            name="unit_${itemCounter}">
+                        <option value="pieces">Pieces</option>
+                        <option value="box">Box</option>
+                        <option value="carton">Carton</option>
+                        <option value="sack">Sack</option>
+                        <option value="packet">Packet</option>
+                        <option value="kg">Kilogram</option>
+                        <option value="g">Gram</option>
+                        <option value="liter">Liter</option>
+                        <option value="ml">Milliliter</option>
+                        <option value="meter">Meter</option>
+                        <option value="cm">Centimeter</option>
+                        <option value="dozen">Dozen</option>
+                        <option value="pack">Pack</option>
+                        <option value="set">Set</option>
+                        <option value="pair">Pair</option>
+                        <option value="roll">Roll</option>
+                        <option value="rolls">Rolls</option>
+                        <option value="sheet">Sheet</option>
+                        <option value="unit">Unit</option>
+                    </select>
                 </div>
             </div>
             <div class="col-md-1">
@@ -338,9 +357,9 @@ function updateItemData(itemId) {
         const productCode = itemRow.querySelector(`input[name="product_code_${itemId}"]`).value;
         const productName = itemRow.querySelector(`input[name="product_name_${itemId}"]`).value;
         const quantity = itemRow.querySelector(`input[name="quantity_${itemId}"]`).value;
-        const notes = itemRow.querySelector(`input[name="notes_${itemId}"]`).value;
+        const unit = itemRow.querySelector(`select[name="unit_${itemId}"]`).value;
         
-        const itemData = `${productCode}|${productName}|${quantity}|${notes}`;
+        const itemData = `${productCode}|${productName}|${quantity}|${unit}`;
         itemRow.querySelector(`input[name="items_data"]`).value = itemData;
     }
 }
@@ -349,8 +368,15 @@ function updateItemData(itemId) {
 document.addEventListener('input', function(e) {
     if (e.target.name && (e.target.name.startsWith('product_code_') || 
                           e.target.name.startsWith('product_name_') || 
-                          e.target.name.startsWith('quantity_') || 
-                          e.target.name.startsWith('notes_'))) {
+                          e.target.name.startsWith('quantity_'))) {
+        const itemId = e.target.name.split('_').pop();
+        updateItemData(itemId);
+    }
+});
+
+// Update item data when select fields change
+document.addEventListener('change', function(e) {
+    if (e.target.name && e.target.name.startsWith('unit_')) {
         const itemId = e.target.name.split('_').pop();
         updateItemData(itemId);
     }

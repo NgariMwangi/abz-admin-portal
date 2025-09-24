@@ -105,7 +105,7 @@
               <a href="{{ url_for('orders', branch_id=branch.id) }}" class="btn btn-warning">
                 <i class="fas fa-shopping-cart"></i> View Orders
               </a>
-              {% if not branch.products and not branch.orders %}
+              {% if not branch.branch_products and not branch.orders %}
               <button type="button" class="btn btn-danger" onclick="confirmDelete({{ branch.id }}, '{{ branch.name }}')">
                 <i class="fas fa-trash"></i> Delete Branch
               </button>
@@ -128,7 +128,7 @@
             <div class="card-head-row">
               <div class="card-title">Products in this Branch</div>
               <div class="card-tools">
-                <span class="badge badge-info">{{ products|length }} products</span>
+                <span class="badge badge-info">{{ products|length }} of {{ total_products }} products</span>
               </div>
             </div>
           </div>
@@ -145,37 +145,37 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {% for product in products %}
+                  {% for branch_product in products %}
                   <tr>
                     <td>
                       <div class="d-flex align-items-center">
-                        {% if product.image_url %}
-                        <img src="{{ product.image_url }}" alt="{{ product.name }}" class="me-3" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
+                        {% if branch_product.catalog_product and branch_product.catalog_product.image_url %}
+                        <img src="{{ branch_product.catalog_product.image_url }}" alt="{{ branch_product.catalog_product.name }}" class="me-3" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
                         {% else %}
                         <div class="bg-light rounded me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
                           <i class="fas fa-box text-muted"></i>
                         </div>
                         {% endif %}
                         <div>
-                          <div class="fw-bold">{{ product.name }}</div>
-                          {% if product.category %}
-                          <small class="text-muted">{{ product.category.name }}</small>
+                          <div class="fw-bold">{{ branch_product.catalog_product.name if branch_product.catalog_product else 'Unknown Product' }}</div>
+                          {% if branch_product.catalog_product and branch_product.catalog_product.subcategory and branch_product.catalog_product.subcategory.category %}
+                          <small class="text-muted">{{ branch_product.catalog_product.subcategory.category.name }}</small>
                           {% endif %}
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span class="badge badge-light">{{ product.stock or 0 }}</span>
+                      <span class="badge badge-light">{{ branch_product.stock | format_stock }}</span>
                     </td>
                     <td>
-                      {% if product.sellingprice %}
-                      <strong>KSh {{ "%.2f"|format(product.sellingprice) }}</strong>
+                      {% if branch_product.sellingprice %}
+                      <strong>KSh {{ "%.2f"|format(branch_product.sellingprice) }}</strong>
                       {% else %}
                       <span class="text-muted">N/A</span>
                       {% endif %}
                     </td>
                     <td>
-                      {% if product.display %}
+                      {% if branch_product.display %}
                       <span class="badge badge-success">Active</span>
                       {% else %}
                       <span class="badge badge-secondary">Hidden</span>
@@ -186,6 +186,16 @@
                 </tbody>
               </table>
             </div>
+            {% if total_products > products|length %}
+            <div class="text-center mt-3">
+              <p class="text-muted">
+                <small>Showing {{ products|length }} of {{ total_products }} products</small>
+              </p>
+              <a href="{{ url_for('branch_products', branch_id=branch.id) }}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-eye"></i> View All Products
+              </a>
+            </div>
+            {% endif %}
             {% else %}
             <div class="text-center py-4">
               <i class="fas fa-box fa-3x text-muted mb-3"></i>

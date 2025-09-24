@@ -143,6 +143,7 @@
                     <th>Product Code</th>
                     <th>Product Name</th>
                     <th>Quantity</th>
+                    <th>Unit</th>
                     <th>Unit Price</th>
                     <th>Total Price</th>
                     <th>Received</th>
@@ -159,6 +160,9 @@
                       <div class="fw-bold">{{ item.product_name or '' }}</div>
                     </td>
                     <td>{{ item.quantity | format_quantity if item.quantity else '0' }}</td>
+                    <td>
+                      <span class="badge bg-info">{{ item.unit or '' }}</span>
+                    </td>
                     <td>KSh {{ "{:,.0f}".format(item.unit_price) if item.unit_price else 'N/A' }}</td>
                     <td>
                       <strong>KSh {{ "{:,.0f}".format(item.total_price) if item.total_price else 'N/A' }}</strong>

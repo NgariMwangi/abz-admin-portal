@@ -21,17 +21,17 @@
       <tr>
         <td>{{ product.id }}</td>
         <td>
-          {% if product.image_url %}
-          <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
+          {% if product.catalog_product and product.catalog_product.image_url %}
+          <img src="{{ product.catalog_product.image_url }}" alt="{{ product.catalog_product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
           {% else %}
           <span class="text-muted">No image</span>
           {% endif %}
         </td>
-        <td>{{ product.name }}</td>
+        <td>{{ product.catalog_product.name if product.catalog_product else 'Unknown Product' }}</td>
         <td>
-          {% if product.sub_category %}
-            <span class="badge bg-primary">{{ product.sub_category.name }}</span>
-            <br><small class="text-muted">{{ product.sub_category.category.name }}</small>
+          {% if product.catalog_product and product.catalog_product.sub_category %}
+            <span class="badge bg-primary">{{ product.catalog_product.sub_category.name }}</span>
+            <br><small class="text-muted">{{ product.catalog_product.sub_category.category.name }}</small>
           {% else %}
             <span class="text-muted">No category</span>
           {% endif %}
@@ -45,10 +45,10 @@
         </td>
         <td>{{ product.buyingprice }}</td>
         <td>{{ product.sellingprice }}</td>
-        <td>{{ product.stock }}</td>
-        <td>{{ product.productcode }}</td>
+        <td>{{ product.stock | format_stock }}</td>
+        <td>{{ product.catalog_product.productcode if product.catalog_product else 'N/A' }}</td>
         <td>
-          <form action="{{ url_for('toggle_display', product_id=product.id) }}" method="POST" style="display: inline;">
+          <form action="{{ url_for('toggle_display', branch_product_id=product.id) }}" method="POST" style="display: inline;">
             <button type="submit" class="btn btn-sm {% if product.display %}btn-success{% else %}btn-secondary{% endif %}" title="{% if product.display %}Visible in customer app{% else %}Hidden from customer app{% endif %}">
               <i class="fas {% if product.display %}fa-eye{% else %}fa-eye-slash{% endif %}"></i>
             </button>
@@ -65,10 +65,10 @@
             <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#removeStockModal{{ product.id }}" title="Remove Stock">
               <i class="fas fa-minus"></i>
             </button>
-            <button class="btn btn-info btn-sm" onclick="window.location.href='{{ url_for('stock_history', product_id=product.id) }}'" title="Stock History">
+            <button class="btn btn-info btn-sm" onclick="window.location.href='{{ url_for('stock_history', branch_product_id=product.id) }}'" title="Stock History">
               <i class="fas fa-history"></i>
             </button>
-            <a href="{{ url_for('product_descriptions', product_id=product.id) }}" class="btn btn-secondary btn-sm" title="Manage Descriptions">
+            <a href="{{ url_for('product_descriptions', product_id=product.catalog_product.id) if product.catalog_product else '#' }}" class="btn btn-secondary btn-sm" title="Manage Descriptions">
               <i class="fas fa-file-alt"></i>
             </a>
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProductModal{{ product.id }}" title="Edit Product">

@@ -56,7 +56,7 @@
                 </p>
                 <p class="text-muted">
                   <strong>Product Code:</strong> {{ product.productcode or 'N/A' }}
-                  | <strong>Stock:</strong> {{ product.stock or 0 }}
+                  | <strong>Stock:</strong> {{ product.stock | format_stock }}
                   | <strong>Status:</strong> 
                   <span class="badge {% if product.display %}badge-success{% else %}badge-secondary{% endif %}">
                     {{ 'Active' if product.display else 'Hidden' }}

@@ -1,0 +1,479 @@
+{% extends "navbars.html" %}
+
+<!-- END nav -->
+{% block content %}
+<style>
+.action-buttons {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.action-buttons .btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Search Bar Styling */
+.search-container {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #e9ecef;
+}
+
+.search-container .input-group {
+  margin-bottom: 10px;
+}
+
+.search-container .form-control {
+  border-radius: 6px;
+}
+
+.search-container .input-group-text {
+  background-color: #fff;
+  border-right: none;
+}
+
+.search-container .form-control {
+  border-left: none;
+}
+
+.search-container .form-control:focus {
+  box-shadow: none;
+  border-color: #ced4da;
+}
+
+/* Filter Styling */
+.filter-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-container .form-control {
+  min-width: 150px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .filter-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filter-container .form-control {
+    min-width: auto;
+  }
+}
+</style>
+
+<!-- Search functionality disabled - using simple form-based search instead -->
+<!-- <script src="{{ url_for('static', filename='js/search.js') }}"></script> -->
+
+<div class="container">
+  <div class="page-inner">
+    <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+      <div>
+        <h3 class="fw-bold mb-3">Product Catalog</h3>
+        <h6 class="op-7 mb-2">Manage your product catalog - shared across all branches</h6>
+      </div>
+      <div class="ms-md-auto py-2 py-md-0">
+        <button class="btn btn-primary btn-round" data-bs-toggle="modal" data-bs-target="#addCatalogProductModal">
+          Add Product to Catalog
+        </button>
+      </div>
+    </div>
+
+    <!-- Products Section -->
+    <div class="row mt-4">
+      <div class="col-md-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <h4 class="card-title">Product Catalog</h4>
+              <div class="card-tools">
+                <button class="btn btn-icon btn-link btn-primary btn-xs" data-bs-toggle="collapse" data-bs-target="#catalogCollapse">
+                  <span class="fa fa-angle-down"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="card-body collapse show" id="catalogCollapse">
+            <!-- Products Search Bar -->
+            <div class="search-container">
+              <div class="filter-container">
+                <form method="GET" action="{{ url_for('product_catalog') }}" class="row g-3">
+                  <div class="col-md-4">
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="fas fa-search"></i></span>
+                      <input type="text" class="form-control" id="catalogSearch" name="search" 
+                             value="{{ search }}" placeholder="Search products by name, code, or category...">
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <select class="form-control" id="categoryFilter" name="category">
+                      <option value="">All Categories</option>
+                      {% for subcategory in subcategories %}
+                      <option value="{{ subcategory.name }}" {% if category_filter == subcategory.name %}selected{% endif %}>
+                        {{ subcategory.name }} ({{ subcategory.category.name }})
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <select class="form-control" name="per_page">
+                      <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10 per page</option>
+                      <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25 per page</option>
+                      <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50 per page</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                      <i class="fas fa-search"></i> Search
+                    </button>
+                    <a href="{{ url_for('product_catalog') }}" class="btn btn-secondary">
+                      <i class="fas fa-times"></i> Clear
+                    </a>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover" id="catalogTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Image</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Product Code</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for catalog_product in catalog_products %}
+                  <tr>
+                    <td>{{ catalog_product.id }}</td>
+                    <td>
+                      {% if catalog_product.image_url %}
+                      <img src="{{ catalog_product.image_url }}" alt="{{ catalog_product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
+                      {% else %}
+                      <span class="text-muted">No image</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ catalog_product.name | upper }}</td>
+                    <td>
+                      {% if catalog_product.subcategory_id %}
+                        {% for subcategory in subcategories %}
+                          {% if subcategory.id == catalog_product.subcategory_id %}
+                            <span class="badge bg-primary">{{ subcategory.name }}</span>
+                            <br><small class="text-muted">{{ subcategory.category.name }}</small>
+                          {% endif %}
+                        {% endfor %}
+                      {% else %}
+                        <span class="text-muted">No category</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ catalog_product.productcode }}</td>
+                    <td>
+                      <div class="action-buttons">
+                        <button class="btn btn-primary btn-sm edit-product-btn" 
+                                data-product-id="{{ catalog_product.id }}"
+                                data-product-name="{{ catalog_product.name }}"
+                                data-product-code="{{ catalog_product.productcode or '' }}"
+                                data-subcategory-id="{{ catalog_product.subcategory_id or '' }}"
+                                data-image-url="{{ catalog_product.image_url or '' }}"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#editCatalogProductModal" 
+                                title="Edit Product">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm delete-product-btn" 
+                                data-product-id="{{ catalog_product.id }}"
+                                data-product-name="{{ catalog_product.name }}"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#deleteCatalogProductModal" 
+                                title="Delete Product">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- Pagination Controls -->
+            <div class="d-flex justify-content-between align-items-center mt-3">
+              <div class="pagination-info">
+                <small class="text-muted">
+                  {% if pagination %}
+                    Showing {{ pagination.items|length }} of {{ pagination.total }} catalog products
+                  {% else %}
+                    Showing all catalog products
+                  {% endif %}
+                </small>
+              </div>
+              
+              {% if pagination and pagination.pages > 1 %}
+              <nav aria-label="Catalog pagination">
+                <ul class="pagination pagination-sm mb-0">
+                  {% if pagination.has_prev %}
+                    <li class="page-item">
+                      <a class="page-link" href="{{ url_for('product_catalog', page=pagination.prev_num, per_page=request.args.get('per_page', 10), search=search, category=category_filter) }}">&laquo;</a>
+                    </li>
+                  {% endif %}
+                  
+                  {% for page_num in pagination.iter_pages() %}
+                    {% if page_num %}
+                      {% if page_num != pagination.page %}
+                        <li class="page-item">
+                          <a class="page-link" href="{{ url_for('product_catalog', page=page_num, per_page=request.args.get('per_page', 10), search=search, category=category_filter) }}">{{ page_num }}</a>
+                        </li>
+                      {% else %}
+                        <li class="page-item active">
+                          <span class="page-link">{{ page_num }}</span>
+                        </li>
+                      {% endif %}
+                    {% else %}
+                      <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                      </li>
+                    {% endif %}
+                  {% endfor %}
+                  
+                  {% if pagination.has_next %}
+                    <li class="page-item">
+                      <a class="page-link" href="{{ url_for('product_catalog', page=pagination.next_num, per_page=request.args.get('per_page', 10), search=search, category=category_filter) }}">&raquo;</a>
+                    </li>
+                  {% endif %}
+                </ul>
+              </nav>
+              {% else %}
+              <div class="text-muted">
+                <small>Page 1 of 1</small>
+              </div>
+              {% endif %}
+              
+              <!-- Items per page selector -->
+              <div class="items-per-page">
+                <small class="text-muted">Items per page:</small>
+                <select class="form-select form-select-sm d-inline-block w-auto ms-2" onchange="changeItemsPerPage(this.value)">
+                  <option value="5" {% if request.args.get('per_page', '10') == '5' %}selected{% endif %}>5</option>
+                  <option value="10" {% if request.args.get('per_page', '10') == '10' %}selected{% endif %}>10</option>
+                  <option value="25" {% if request.args.get('per_page', '10') == '25' %}selected{% endif %}>25</option>
+                  <option value="50" {% if request.args.get('per_page', '10') == '50' %}selected{% endif %}>50</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Catalog Product Modal -->
+<div class="modal fade" id="addCatalogProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add New Product to Catalog</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('add_product_to_catalog') }}" method="POST" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="catalogProductName" class="form-label">Name</label>
+                <input type="text" class="form-control" id="catalogProductName" name="name" required>
+              </div>
+              <div class="mb-3">
+                <label for="catalogProductSubcategory" class="form-label">Subcategory</label>
+                <select class="form-control" id="catalogProductSubcategory" name="subcategory_id">
+                  <option value="">No subcategory</option>
+                  {% for subcategory in subcategories %}
+                  <option value="{{ subcategory.id }}">{{ subcategory.name }} ({{ subcategory.category.name }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="catalogProductCode" class="form-label">Product Code</label>
+                <input type="text" class="form-control" id="catalogProductCode" name="productcode">
+              </div>
+              <div class="mb-3">
+                <label for="catalogProductImage" class="form-label">Product Image</label>
+                <input type="file" class="form-control" id="catalogProductImage" name="image">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Add to Catalog</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing catalog search functionality...');
+    
+    // Function to change items per page
+    window.changeItemsPerPage = function(perPage) {
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('per_page', perPage);
+        currentUrl.searchParams.set('page', '1'); // Reset to first page
+        window.location.href = currentUrl.toString();
+    };
+    
+    console.log('Catalog search functionality initialized successfully');
+});
+
+// Event delegation for edit and delete buttons
+document.addEventListener('click', function(e) {
+    // Handle edit button clicks
+    if (e.target.closest('.edit-product-btn')) {
+        e.preventDefault();
+        const button = e.target.closest('.edit-product-btn');
+        const productId = button.getAttribute('data-product-id');
+        const productName = button.getAttribute('data-product-name');
+        const productCode = button.getAttribute('data-product-code');
+        const subcategoryId = button.getAttribute('data-subcategory-id');
+        const imageUrl = button.getAttribute('data-image-url');
+        
+        console.log('Opening edit modal for product:', productId);
+        
+        // Set form action
+        document.getElementById('editCatalogProductForm').action = `/edit_catalog_product/${productId}`;
+        
+        // Populate form fields
+        document.getElementById('editCatalogProductName').value = productName;
+        document.getElementById('editCatalogProductCode').value = productCode || '';
+        
+        // Set subcategory
+        const subcategorySelect = document.getElementById('editCatalogProductSubcategory');
+        subcategorySelect.value = subcategoryId || '';
+        
+        // Show current image info
+        const imageInfo = document.getElementById('currentImageInfo');
+        if (imageUrl) {
+            imageInfo.textContent = `Current: ${imageUrl}`;
+            imageInfo.style.display = 'block';
+        } else {
+            imageInfo.style.display = 'none';
+        }
+        
+        // Show modal using Bootstrap's built-in method
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editCatalogProductModal'));
+        modal.show();
+    }
+    
+    // Handle delete button clicks
+    if (e.target.closest('.delete-product-btn')) {
+        e.preventDefault();
+        const button = e.target.closest('.delete-product-btn');
+        const productId = button.getAttribute('data-product-id');
+        const productName = button.getAttribute('data-product-name');
+        
+        console.log('Opening delete modal for product:', productId);
+        
+        // Set form action
+        document.getElementById('deleteCatalogProductForm').action = `/delete_catalog_product/${productId}`;
+        
+        // Set product name
+        document.getElementById('deleteProductName').textContent = productName;
+        
+        // Show modal using Bootstrap's built-in method
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteCatalogProductModal'));
+        modal.show();
+    }
+});
+</script>
+
+<!-- Single Edit Catalog Product Modal -->
+<div class="modal fade" id="editCatalogProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Catalog Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editCatalogProductForm" method="POST" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="editCatalogProductName" class="form-label">Name</label>
+                <input type="text" class="form-control" id="editCatalogProductName" name="name" required>
+              </div>
+              <div class="mb-3">
+                <label for="editCatalogProductSubcategory" class="form-label">Subcategory</label>
+                <select class="form-control" id="editCatalogProductSubcategory" name="subcategory_id">
+                  <option value="">No subcategory</option>
+                  {% for subcategory in subcategories %}
+                  <option value="{{ subcategory.id }}">
+                    {{ subcategory.name }} ({{ subcategory.category.name }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="editCatalogProductCode" class="form-label">Product Code</label>
+                <input type="text" class="form-control" id="editCatalogProductCode" name="productcode">
+              </div>
+              <div class="mb-3">
+                <label for="editCatalogProductImage" class="form-label">Product Image</label>
+                <input type="file" class="form-control" id="editCatalogProductImage" name="image">
+                <small id="currentImageInfo" class="text-muted"></small>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Single Delete Catalog Product Modal -->
+<div class="modal fade" id="deleteCatalogProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete Catalog Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="deleteCatalogProductForm" method="POST">
+        <div class="modal-body">
+          <p>Are you sure you want to delete this catalog product? This action cannot be undone.</p>
+          <p><strong>Product:</strong> <span id="deleteProductName"></span></p>
+          <p><strong>Note:</strong> This will not delete the product from branches where it's already been added.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

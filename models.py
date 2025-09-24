@@ -12,7 +12,7 @@ class Branch(db.Model):
     location = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     image_url = db.Column(db.String, nullable=True)
-    products = db.relationship('Product', backref='branch', lazy=True)
+    branch_products = db.relationship('BranchProduct', backref='branch', lazy=True)
     orders = db.relationship('Order', backref='branch', lazy=True)
 
 
@@ -27,7 +27,7 @@ class Category(db.Model):
     
     @property
     def products(self):
-        """Get all products in this category through subcategories"""
+        """Get all catalog products in this category through subcategories"""
         from sqlalchemy import and_
         # Check if this category has any subcategories
         subcategories = SubCategory.query.filter_by(category_id=self.id).all()
@@ -35,7 +35,7 @@ class Category(db.Model):
             return []
         
         subcategory_ids = [sub.id for sub in subcategories]
-        return Product.query.filter(Product.subcategory_id.in_(subcategory_ids)).all()
+        return ProductCatalog.query.filter(ProductCatalog.subcategory_id.in_(subcategory_ids)).all()
 
 
 class User(db.Model):
@@ -140,29 +140,31 @@ class PasswordReset(db.Model):
         """Check if the token has expired"""
         return datetime.utcnow() > self.expires_at
 
-class Product(db.Model):
-    __tablename__ = 'products'
-    id = db.Column(db.Integer, primary_key=True)
-    branchid = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
-    name = db.Column(db.String, nullable=False)
-    image_url = db.Column(db.String, nullable=True)
-    buyingprice = db.Column(db.Integer, nullable=True)
-    sellingprice = db.Column(db.Integer, nullable=True)
-    stock = db.Column(db.Numeric(10, 3), nullable=True)  # Support up to 3 decimal places
-    productcode = db.Column(db.String, nullable=True)
-    display = db.Column(db.Boolean, default=True)  # Controls visibility in customer app
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
-    subcategory_id = db.Column(db.Integer, db.ForeignKey('sub_category.id'), nullable=True)
-    order_items = db.relationship('OrderItem', backref='product', lazy=True)
-    stock_transactions = db.relationship('StockTransaction', backref='product', lazy=True)
-    descriptions = db.relationship('ProductDescription', backref='product', lazy=True)
+# DEPRECATED: Legacy Product class - replaced by ProductCatalog and BranchProduct
+# class Product(db.Model):
+#     __tablename__ = 'products'
+#     id = db.Column(db.Integer, primary_key=True)
+#     branchid = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
+#     name = db.Column(db.String, nullable=False)
+#     image_url = db.Column(db.String, nullable=True)
+#     buyingprice = db.Column(db.Integer, nullable=True)
+#     sellingprice = db.Column(db.Integer, nullable=True)
+#     stock = db.Column(db.Numeric(10, 3), nullable=True)  # Support up to 3 decimal places
+#     productcode = db.Column(db.String, nullable=True)
+#     display = db.Column(db.Boolean, default=True)  # Controls visibility in customer app
+#     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
+#     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
+#     subcategory_id = db.Column(db.Integer, db.ForeignKey('sub_category.id'), nullable=True)
+#     order_items = db.relationship('OrderItem', backref='product', lazy=True)
+#     stock_transactions = db.relationship('StockTransaction', backref='product', lazy=True)
+#     descriptions = db.relationship('ProductDescription', backref='product', lazy=True)
 
 
 class ProductDescription(db.Model):
     __tablename__ = 'product_descriptions'
     id = db.Column(db.Integer, primary_key=True)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    product_id = db.Column(db.Integer, nullable=True)  # Legacy field, no foreign key constraint
+    branch_productid = db.Column(db.Integer, db.ForeignKey('branch_products.id'), nullable=True)
     title = db.Column(db.String, nullable=False)  # e.g., "Overview", "Specifications", "Features"
     content = db.Column(db.Text, nullable=False)  # Rich text content
     content_type = db.Column(db.String, default='text')  # text, html, markdown
@@ -172,11 +174,14 @@ class ProductDescription(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
 
+    branch_product = db.relationship("BranchProduct", back_populates="product_descriptions")
+
 
 class StockTransaction(db.Model):
     __tablename__ = 'stock_transactions'
     id = db.Column(db.Integer, primary_key=True)
-    productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    productid = db.Column(db.Integer, nullable=True)  # Legacy field, no foreign key constraint
+    branch_productid = db.Column(db.Integer, db.ForeignKey('branch_products.id'), nullable=True)
     userid = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     transaction_type = db.Column(db.String, nullable=False)  # 'add' or 'remove'
     quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
@@ -184,6 +189,8 @@ class StockTransaction(db.Model):
     new_stock = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     notes = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
+
+    branch_product = db.relationship("BranchProduct", back_populates="stock_transactions")
 
 
 class OrderType(db.Model):
@@ -213,7 +220,8 @@ class OrderItem(db.Model):
     __tablename__ = 'orderitems'
     id = db.Column(db.Integer, primary_key=True)
     orderid = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
+    productid = db.Column(db.Integer, nullable=True)  # Legacy field, no foreign key constraint
+    branch_productid = db.Column(db.Integer, db.ForeignKey('branch_products.id'), nullable=True)
     product_name = db.Column(db.String(255), nullable=True)  # Product name for both regular and manual items
     quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     buying_price = db.Column(db.Numeric(10, 2), nullable=True)  # Product buying price at time of order
@@ -224,7 +232,7 @@ class OrderItem(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
 
-    
+    branch_product = db.relationship("BranchProduct", back_populates="order_items")
 
 
 class Payment(db.Model):
@@ -323,7 +331,8 @@ class SubCategory(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
 
-    products = db.relationship('Product', backref='sub_category', lazy=True)
+    # Legacy relationship commented out - now using ProductCatalog
+    # products = db.relationship('Product', backref='sub_category', lazy=True)
 
 
 class Expense(db.Model):
@@ -407,6 +416,7 @@ class PurchaseOrderItem(db.Model):
     product_code = db.Column(db.String, nullable=True)  # User manually types product code
     product_name = db.Column(db.String, nullable=True)   # User manually types product name
     quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
+    unit = db.Column(db.String(20), nullable=True)  # Unit of measurement (pieces, box, kg, etc.)
     unit_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, filled when invoice received
     total_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, calculated when prices are set
     received_quantity = db.Column(db.Numeric(10, 3), nullable=False, default=0)  # Support up to 3 decimal places
@@ -442,7 +452,8 @@ class QuotationItem(db.Model):
     __tablename__ = 'quotationitems'
     id = db.Column(db.Integer, primary_key=True)
     quotation_id = db.Column(db.Integer, db.ForeignKey('quotations.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    product_id = db.Column(db.Integer, nullable=True)  # Legacy field, no foreign key constraint
+    branch_productid = db.Column(db.Integer, db.ForeignKey('branch_products.id'), nullable=True)
     quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
@@ -450,4 +461,39 @@ class QuotationItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     product_name = db.Column(db.String(255), nullable=True)  # For manual items
     # Relationships
-    product = db.relationship('Product', backref='quotation_items')
+    # Legacy relationship commented out - now using BranchProduct
+    # product = db.relationship('Product', backref='quotation_items')
+    branch_product = db.relationship("BranchProduct", back_populates="quotation_items")
+
+
+class ProductCatalog(db.Model):
+    __tablename__ = 'product_catalog'
+
+    id = db.Column(db.Integer, primary_key=True, index=True)
+    name = db.Column(db.String, nullable=False)
+    productcode = db.Column(db.String, nullable=True)
+    image_url = db.Column(db.String, nullable=True)
+    subcategory_id = db.Column(db.Integer, nullable=True)
+
+    branch_products = db.relationship("BranchProduct", back_populates="catalog_product")
+
+
+class BranchProduct(db.Model):
+    __tablename__ = 'branch_products'
+
+    id = db.Column(db.Integer, primary_key=True, index=True)
+    branchid = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
+    catalog_id = db.Column(db.Integer, db.ForeignKey('product_catalog.id'), nullable=False)
+    buyingprice = db.Column(db.Numeric(10, 2), nullable=True)
+    sellingprice = db.Column(db.Numeric(10, 2), nullable=True)
+    stock = db.Column(db.Integer, nullable=True)
+    display = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
+
+    catalog_product = db.relationship("ProductCatalog", back_populates="branch_products")
+    order_items = db.relationship("OrderItem", back_populates="branch_product")
+    stock_transactions = db.relationship("StockTransaction", back_populates="branch_product")
+    product_descriptions = db.relationship("ProductDescription", back_populates="branch_product")
+    quotation_items = db.relationship("QuotationItem", back_populates="branch_product")
+

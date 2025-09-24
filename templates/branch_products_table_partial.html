@@ -16,46 +16,74 @@
       </tr>
     </thead>
     <tbody>
-      {% for product in products %}
+      {% for branch_product in branch_products %}
       <tr>
-        <td>{{ product.id }}</td>
+        <td>{{ branch_product.id }}</td>
         <td>
-          {% if product.image_url %}
-          <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
+          {% if branch_product.catalog_product and branch_product.catalog_product.image_url %}
+          <img src="{{ branch_product.catalog_product.image_url }}" alt="{{ branch_product.catalog_product.name }}" style="width: 50px; height: 50px; object-fit: cover;">
           {% else %}
           <span class="text-muted">No image</span>
           {% endif %}
         </td>
-        <td>{{ product.name }}</td>
         <td>
-          {% if product.sub_category %}
-            {{ product.sub_category.name }} ({{ product.sub_category.category.name }})
+          {% if branch_product.catalog_product %}
+            {{ branch_product.catalog_product.name }}
+          {% else %}
+            <span class="text-muted">Unknown Product</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if branch_product.catalog_product and branch_product.catalog_product.subcategory_id %}
+            {% for subcategory in subcategories %}
+              {% if subcategory.id == branch_product.catalog_product.subcategory_id %}
+                {{ subcategory.name }} ({{ subcategory.category.name }})
+              {% endif %}
+            {% endfor %}
           {% else %}
             <span class="text-muted">No category</span>
           {% endif %}
         </td>
-        <td>{{ product.buyingprice or 'N/A' }}</td>
-        <td>{{ product.sellingprice or 'N/A' }}</td>
+        <td>{{ branch_product.buyingprice or 'N/A' }}</td>
+        <td>{{ branch_product.sellingprice or 'N/A' }}</td>
         <td>
-          <span class="badge {% if product.stock > 10 %}badge-success{% elif product.stock > 0 %}badge-warning{% else %}badge-danger{% endif %}">
-            {{ product.stock or 0 }}
+          <span class="badge {% if branch_product.stock > 10 %}badge-success{% elif branch_product.stock > 0 %}badge-warning{% else %}badge-danger{% endif %}">
+            {{ branch_product.stock | format_stock }}
           </span>
         </td>
-        <td>{{ product.productcode or 'N/A' }}</td>
         <td>
-          <span class="badge {% if product.display %}badge-success{% else %}badge-secondary{% endif %}">
-            {{ 'Visible' if product.display else 'Hidden' }}
+          {% if branch_product.catalog_product %}
+            {{ branch_product.catalog_product.productcode or 'N/A' }}
+          {% else %}
+            N/A
+          {% endif %}
+        </td>
+        <td>
+          <span class="badge {% if branch_product.display %}badge-success{% else %}badge-secondary{% endif %}">
+            {{ 'Visible' if branch_product.display else 'Hidden' }}
           </span>
         </td>
         <td>
           <div class="action-buttons">
-            <button class="btn btn-sm btn-info" onclick="viewProduct({{ product.id }})" title="View Details">
-              <i class="fas fa-eye"></i>
+            <button class="btn btn-sm btn-success" onclick="addStock({{ branch_product.id }})" title="Add Stock">
+              <i class="fas fa-plus"></i>
             </button>
-            <button class="btn btn-sm btn-primary" onclick="editProduct({{ product.id }})" title="Edit">
+            <button class="btn btn-sm btn-warning" onclick="removeStock({{ branch_product.id }})" title="Remove Stock">
+              <i class="fas fa-minus"></i>
+            </button>
+            <button class="btn btn-sm btn-info" onclick="window.location.href='{{ url_for('stock_history', branch_product_id=branch_product.id) }}'" title="Stock History">
+              <i class="fas fa-history"></i>
+            </button>
+            <a href="{{ url_for('product_descriptions', product_id=branch_product.catalog_product.id) if branch_product.catalog_product else '#' }}" class="btn btn-sm btn-info" title="Manage Descriptions">
+              <i class="fas fa-file-alt"></i>
+            </a>
+            <button class="btn btn-sm btn-primary" onclick="editBranchProduct({{ branch_product.id }})" title="Edit">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="btn btn-sm btn-danger" onclick="deleteProduct({{ product.id }})" title="Delete">
+            <button class="btn btn-sm btn-secondary" onclick="toggleDisplay({{ branch_product.id }})" title="Toggle Display">
+              <i class="fas {% if branch_product.display %}fa-eye-slash{% else %}fa-eye{% endif %}"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="deleteBranchProduct({{ branch_product.id }})" title="Delete">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -109,7 +137,7 @@
 
 <!-- Result Count -->
 <div class="text-center text-muted mt-3">
-  Showing {{ pagination.items|length }} of {{ pagination.total }} products in {{ branch.name }}
+  Showing {{ pagination.items|length }} of {{ pagination.total }} branch products in {{ branch.name }}
   {% if search or category_filter or display_filter %}
     (filtered results)
   {% endif %}
