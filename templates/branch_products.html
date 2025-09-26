@@ -356,7 +356,11 @@
                 </a>
                 <a href="{{ url_for('export_products_by_category_csv', branch_id=branch.id) }}" 
                    class="btn btn-primary btn-sm">
-                  <i class="fas fa-layer-group"></i> Export by Category
+                  <i class="fas fa-layer-group"></i> Export by Category (CSV)
+                </a>
+                <a href="{{ url_for('export_products_by_category_pdf', branch_id=branch.id) }}" 
+                   class="btn btn-danger btn-sm">
+                  <i class="fas fa-file-pdf"></i> Export by Category (PDF)
                 </a>
               </div>
             </div>

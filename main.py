@@ -812,12 +812,27 @@ def export_products_csv():
         ])
         
         for product in products:
+            # Get category and subcategory names
+            category_name = ''
+            subcategory_name = ''
+            if hasattr(product, 'sub_category') and product.sub_category:
+                subcategory_name = product.sub_category.name
+                if product.sub_category.category:
+                    category_name = product.sub_category.category.name
+            elif product.subcategory_id:
+                # Fallback: query directly
+                subcategory = SubCategory.query.get(product.subcategory_id)
+                if subcategory:
+                    subcategory_name = subcategory.name
+                    if subcategory.category:
+                        category_name = subcategory.category.name
+            
             csv_data.append([
                 product.id,
                 product.productcode or '',
                 product.name or '',
-                product.sub_category.category.name if product.sub_category and product.sub_category.category else '',
-                product.sub_category.name if product.sub_category else '',
+                category_name,
+                subcategory_name,
                 product.image_url or ''
             ])
         
@@ -846,53 +861,135 @@ def export_products_by_category_csv():
         # Get branch filter from query parameter
         branch_id = request.args.get('branch_id', type=int)
         
-        # Base query with joins
-        base_query = ProductCatalog.query.join(
-            SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
-        ).join(
-            Category, SubCategory.category_id == Category.id, isouter=True
-        )
-        
-        # Note: ProductCatalog is global, so we don't filter by branch_id
-        
-        # Get all catalog products ordered by category
-        products = base_query.order_by(Category.name, ProductCatalog.name).all()
-        
-        # Group products by category
-        products_by_category = {}
-        for product in products:
-            category_name = product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized'
-            if category_name not in products_by_category:
-                products_by_category[category_name] = []
-            products_by_category[category_name].append(product)
-        
-        # Create CSV data
-        csv_data = []
-        csv_data.append(['Category', 'ProductCatalog Name', 'ProductCatalog Code'])
-        
-        # Add products grouped by category
-        for category_name in sorted(products_by_category.keys()):
-            category_products = products_by_category[category_name]
-            for i, product in enumerate(category_products):
-                # Format product name with code: "productname - code"
-                product_name_with_code = product.name or ''
-                if product.productcode:
-                    product_name_with_code = f"{product_name_with_code} - {product.productcode}"
+        if branch_id:
+            # Export branch-specific products
+            base_query = BranchProduct.query.filter(BranchProduct.branchid == branch_id).join(
+                ProductCatalog, BranchProduct.catalog_id == ProductCatalog.id
+            ).join(
+                SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
+            ).join(
+                Category, SubCategory.category_id == Category.id, isouter=True
+            )
+            
+            # Get all branch products ordered by category
+            branch_products = base_query.order_by(Category.name, ProductCatalog.name).all()
+            
+            # Group products by category
+            products_by_category = {}
+            for branch_product in branch_products:
+                product = branch_product.catalog_product
+                # Get category name through the join
+                category_name = 'Uncategorized'
+                if hasattr(product, 'sub_category') and product.sub_category and product.sub_category.category:
+                    category_name = product.sub_category.category.name
+                elif product.subcategory_id:
+                    # Fallback: query the subcategory and category directly
+                    subcategory = SubCategory.query.get(product.subcategory_id)
+                    if subcategory and subcategory.category:
+                        category_name = subcategory.category.name
                 
-                if i == 0:
-                    # First product in category - include category name
-                    csv_data.append([
-                        category_name,
-                        product_name_with_code,
-                        product.productcode or ''
-                    ])
-                else:
-                    # Subsequent products in category - leave category name empty
-                    csv_data.append([
-                        '',  # Empty category name for grouping
-                        product_name_with_code,
-                        product.productcode or ''
-                    ])
+                if category_name not in products_by_category:
+                    products_by_category[category_name] = []
+                products_by_category[category_name].append({
+                    'product': product,
+                    'branch_product': branch_product
+                })
+            
+            # Create CSV data with branch-specific information
+            csv_data = []
+            csv_data.append(['Category', 'Product Name', 'Product Code', 'Buying Price', 'Selling Price', 'Stock'])
+            
+            # Add products grouped by category
+            for category_name in sorted(products_by_category.keys()):
+                category_products = products_by_category[category_name]
+                for i, item in enumerate(category_products):
+                    product = item['product']
+                    branch_product = item['branch_product']
+                    
+                    # Use only product name
+                    product_name = product.name or ''
+                    
+                    if i == 0:
+                        # First product in category - include category name
+                        csv_data.append([
+                            category_name,
+                            product_name,
+                            product.productcode or '',
+                            branch_product.buyingprice or '',
+                            branch_product.sellingprice or '',
+                            branch_product.stock or ''
+                        ])
+                    else:
+                        # Subsequent products in category - leave category name empty
+                        csv_data.append([
+                            '',  # Empty category name for grouping
+                            product_name,
+                            product.productcode or '',
+                            branch_product.buyingprice or '',
+                            branch_product.sellingprice or '',
+                            branch_product.stock or ''
+                        ])
+            
+            # Get branch name for filename
+            branch = Branch.query.get(branch_id)
+            branch_name = branch.name.lower().replace(' ', '_') if branch else 'branch'
+            filename = f"products_by_category_{branch_name}.csv"
+            
+        else:
+            # Export global catalog products (original behavior)
+            base_query = ProductCatalog.query.join(
+                SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
+            ).join(
+                Category, SubCategory.category_id == Category.id, isouter=True
+            )
+            
+            # Get all catalog products ordered by category
+            products = base_query.order_by(Category.name, ProductCatalog.name).all()
+            
+            # Group products by category
+            products_by_category = {}
+            for product in products:
+                # Get category name through the join
+                category_name = 'Uncategorized'
+                if hasattr(product, 'sub_category') and product.sub_category and product.sub_category.category:
+                    category_name = product.sub_category.category.name
+                elif product.subcategory_id:
+                    # Fallback: query the subcategory and category directly
+                    subcategory = SubCategory.query.get(product.subcategory_id)
+                    if subcategory and subcategory.category:
+                        category_name = subcategory.category.name
+                
+                if category_name not in products_by_category:
+                    products_by_category[category_name] = []
+                products_by_category[category_name].append(product)
+            
+            # Create CSV data
+            csv_data = []
+            csv_data.append(['Category', 'Product Name', 'Product Code'])
+            
+            # Add products grouped by category
+            for category_name in sorted(products_by_category.keys()):
+                category_products = products_by_category[category_name]
+                for i, product in enumerate(category_products):
+                    # Use only product name
+                    product_name = product.name or ''
+                    
+                    if i == 0:
+                        # First product in category - include category name
+                        csv_data.append([
+                            category_name,
+                            product_name,
+                            product.productcode or ''
+                        ])
+                    else:
+                        # Subsequent products in category - leave category name empty
+                        csv_data.append([
+                            '',  # Empty category name for grouping
+                            product_name,
+                            product.productcode or ''
+                        ])
+            
+            filename = "products_by_category_all_branches.csv"
         
         # Create CSV response
         output = StringIO()
@@ -902,13 +999,259 @@ def export_products_by_category_csv():
         # Create response
         response = make_response(output.getvalue())
         response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = 'attachment; filename=products_by_category_export.csv'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
         
         return response
         
     except Exception as e:
         print(f"Error exporting products by category to CSV: {e}")
         flash('An error occurred while exporting products by category.', 'error')
+        return redirect(url_for('products'))
+
+@app.route('/export_products_by_category_pdf')
+@login_required
+@role_required(['admin'])
+def export_products_by_category_pdf():
+    try:
+        # Get branch filter from query parameter
+        branch_id = request.args.get('branch_id', type=int)
+        branch = None
+        if branch_id:
+            branch = Branch.query.get(branch_id)
+        
+        if branch_id:
+            # Export branch-specific products
+            base_query = BranchProduct.query.filter(BranchProduct.branchid == branch_id).join(
+                ProductCatalog, BranchProduct.catalog_id == ProductCatalog.id
+            ).join(
+                SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
+            ).join(
+                Category, SubCategory.category_id == Category.id, isouter=True
+            )
+            
+            # Get all branch products ordered by category
+            branch_products = base_query.order_by(Category.name, ProductCatalog.name).all()
+            
+            # Group products by category
+            products_by_category = {}
+            for branch_product in branch_products:
+                product = branch_product.catalog_product
+                # Get category name through the join
+                category_name = 'Uncategorized'
+                if hasattr(product, 'sub_category') and product.sub_category and product.sub_category.category:
+                    category_name = product.sub_category.category.name
+                elif product.subcategory_id:
+                    # Fallback: query the subcategory and category directly
+                    subcategory = SubCategory.query.get(product.subcategory_id)
+                    if subcategory and subcategory.category:
+                        category_name = subcategory.category.name
+                
+                if category_name not in products_by_category:
+                    products_by_category[category_name] = []
+                products_by_category[category_name].append({
+                    'product': product,
+                    'branch_product': branch_product
+                })
+        else:
+            # Export global catalog products (original behavior)
+            base_query = ProductCatalog.query.join(
+                SubCategory, ProductCatalog.subcategory_id == SubCategory.id, isouter=True
+            ).join(
+                Category, SubCategory.category_id == Category.id, isouter=True
+            )
+            
+            # Get all catalog products ordered by category
+            products = base_query.order_by(Category.name, ProductCatalog.name).all()
+            
+            # Group products by category
+            products_by_category = {}
+            for product in products:
+                # Get category name through the join
+                category_name = 'Uncategorized'
+                if hasattr(product, 'sub_category') and product.sub_category and product.sub_category.category:
+                    category_name = product.sub_category.category.name
+                elif product.subcategory_id:
+                    # Fallback: query the subcategory and category directly
+                    subcategory = SubCategory.query.get(product.subcategory_id)
+                    if subcategory and subcategory.category:
+                        category_name = subcategory.category.name
+                
+                if category_name not in products_by_category:
+                    products_by_category[category_name] = []
+                products_by_category[category_name].append({
+                    'product': product,
+                    'branch_product': None
+                })
+        
+        # Create PDF buffer
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=18)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            alignment=1,  # Center alignment
+            textColor=colors.HexColor('#2c3e50')
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            spaceAfter=20,
+            textColor=colors.HexColor('#34495e')
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=12
+        )
+        
+        # Load the logo image
+        try:
+            logo_path = os.path.join(app.static_folder, 'assets', 'img', 'logo.png')
+            print(f"Loading logo from: {logo_path}")
+            logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
+            logo_cell = logo_image
+        except Exception as e:
+            print(f"Error loading logo: {e}")
+            # Create a placeholder if logo fails to load
+            logo_cell = Paragraph('''
+            <para align=left>
+            <b><font size=18 color="#1a365d">ABZ HARDWARE LIMITED</font></b>
+            </para>
+            ''', normal_style)
+        
+        # Create the letterhead table for proper layout
+        letterhead_data = [
+            [logo_cell, Paragraph('''
+            <para align=right>
+            <b><font size=18 color="#1a365d">ABZ HARDWARE LIMITED</font></b><br/>
+            <font size=12 color="#4a5568">Your Trusted Hardware Partner</font>
+            </para>
+            ''', normal_style)]
+        ]
+        
+        letterhead_table = Table(letterhead_data, colWidths=[2*inch, 4*inch])
+        letterhead_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        
+        elements.append(letterhead_table)
+        elements.append(Spacer(1, 20))
+        
+        # Title
+        elements.append(Paragraph("PRODUCTS BY CATEGORY", title_style))
+        elements.append(Spacer(1, 30))
+        
+        # Branch information
+        if branch:
+            branch_info = f"""
+            <b>Branch:</b> {branch.name}<br/>
+            <b>Location:</b> {branch.location}<br/>
+            <b>Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"""
+        else:
+            branch_info = f"""
+            <b>All Branches</b><br/>
+            <b>Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"""
+        
+        elements.append(Paragraph(branch_info, normal_style))
+        elements.append(Spacer(1, 30))
+        
+        # Products by category
+        for category_name in sorted(products_by_category.keys()):
+            category_products = products_by_category[category_name]
+            
+            # Category header
+            elements.append(Paragraph(f"<b>{category_name.upper()}</b>", heading_style))
+            
+            # Create table for products in this category
+            if branch_id:
+                # Branch-specific export - include pricing and stock info
+                table_data = [['Product Name', 'Product Code', 'Buying Price', 'Selling Price', 'Stock']]
+                col_widths = [2.8*inch, 1.2*inch, 1*inch, 1*inch, 0.8*inch]
+                
+                for item in category_products:
+                    product = item['product']
+                    branch_product = item['branch_product']
+                    product_name = product.name or 'N/A'
+                    product_code = product.productcode or 'N/A'
+                    buying_price = f"KSh {branch_product.buyingprice}" if branch_product.buyingprice else 'N/A'
+                    selling_price = f"KSh {branch_product.sellingprice}" if branch_product.sellingprice else 'N/A'
+                    stock = str(branch_product.stock) if branch_product.stock is not None else 'N/A'
+                    table_data.append([product_name, product_code, buying_price, selling_price, stock])
+            else:
+                # Global catalog export - basic info only
+                table_data = [['Product Name', 'Product Code']]
+                col_widths = [4*inch, 2*inch]
+                
+                for item in category_products:
+                    product = item['product']
+                    product_name = product.name or 'N/A'
+                    product_code = product.productcode or 'N/A'
+                    table_data.append([product_name, product_code])
+            
+            # Create table
+            table = Table(table_data, colWidths=col_widths)
+            table.setStyle(TableStyle([
+                # Header styling
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10 if branch_id else 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                
+                # Data styling
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Product name left
+                ('ALIGN', (1, 1), (-1, -1), 'CENTER'),  # Other columns center
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9 if branch_id else 10),
+                ('TOPPADDING', (0, 1), (-1, -1), 6 if branch_id else 8),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6 if branch_id else 8),
+                ('LEFTPADDING', (0, 1), (-1, -1), 6 if branch_id else 8),
+                ('RIGHTPADDING', (0, 1), (-1, -1), 6 if branch_id else 8),
+                
+                # Grid
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            
+            elements.append(table)
+            elements.append(Spacer(1, 20))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF content
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        # Create response
+        response = make_response(pdf_content)
+        response.headers['Content-Type'] = 'application/pdf'
+        filename = f"products_by_category_{branch.name.lower().replace(' ', '_') if branch else 'all_branches'}.pdf"
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error exporting products by category to PDF: {e}")
+        flash('An error occurred while exporting products by category to PDF.', 'error')
         return redirect(url_for('products'))
 
 @app.route('/branch_products/<int:branch_id>')
@@ -1328,7 +1671,16 @@ def add_branch_product():
     # Convert empty strings to None
     buyingprice = float(buyingprice) if buyingprice else None
     sellingprice = float(sellingprice) if sellingprice else None
-    stock = int(stock) if stock else None
+    
+    # Handle stock conversion properly - convert decimal to int
+    if stock:
+        try:
+            # Convert to float first to handle decimals, then to int
+            stock = int(float(stock))
+        except (ValueError, TypeError):
+            stock = None
+    else:
+        stock = None
     
     new_branch_product = BranchProduct(
         catalog_id=catalog_id,
@@ -1354,7 +1706,18 @@ def edit_branch_product(id):
     # Get form data
     branch_product.buyingprice = float(request.form.get('buyingprice')) if request.form.get('buyingprice') else None
     branch_product.sellingprice = float(request.form.get('sellingprice')) if request.form.get('sellingprice') else None
-    branch_product.stock = int(request.form.get('stock')) if request.form.get('stock') else None
+    
+    # Handle stock conversion properly - convert decimal to int
+    stock_value = request.form.get('stock')
+    if stock_value:
+        try:
+            # Convert to float first to handle decimals, then to int
+            branch_product.stock = int(float(stock_value))
+        except (ValueError, TypeError):
+            branch_product.stock = None
+    else:
+        branch_product.stock = None
+    
     branch_product.display = request.form.get('display') == 'on'
     
     db.session.commit()
