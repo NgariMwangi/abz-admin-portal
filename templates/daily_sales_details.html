@@ -14,9 +14,9 @@
         <a href="{{ url_for('sales_report') }}" class="btn btn-outline-secondary mr-2">
           <i class="fas fa-arrow-left mr-2"></i>Back to Sales Report
         </a>
-        <button type="button" class="btn btn-success" onclick="exportDailyReport()">
-          <i class="fas fa-download mr-2"></i>Export Details
-        </button>
+        <a href="{{ url_for('export_daily_sales_pdf', date=date.strftime('%Y-%m-%d')) }}{% if request.args.get('branch_id') %}?branch_id={{ request.args.get('branch_id') }}{% endif %}" class="btn btn-success">
+          <i class="fas fa-file-pdf mr-2"></i>Export PDF
+        </a>
       </div>
     </div>
 

@@ -5206,23 +5206,38 @@ def sales_report():
 def daily_sales_details(date):
     """Show detailed breakdown of sales for a specific date"""
     try:
+        # Get branch filter from query parameters
+        branch_id = request.args.get('branch_id', type=int)
+        
         # Convert date string to datetime
         date_obj = datetime.strptime(date, '%Y-%m-%d')
         next_day = date_obj + timedelta(days=1)
         
         # Get payments for the specific date
-        payments = db.session.query(Payment).join(Order).filter(
+        payments_query = db.session.query(Payment).join(Order).filter(
             Payment.payment_status == 'completed',
             Payment.created_at >= date_obj,
             Payment.created_at < next_day
-        ).all()
+        )
+        
+        # Apply branch filter if specified
+        if branch_id:
+            payments_query = payments_query.filter(Order.branchid == branch_id)
+        
+        payments = payments_query.all()
         
         # Get order items for the specific date
-        order_items = db.session.query(OrderItem).join(Order).filter(
+        order_items_query = db.session.query(OrderItem).join(Order).filter(
             Order.created_at >= date_obj,
             Order.created_at < next_day,
             Order.payment_status.in_(['paid', 'partially_paid'])
-        ).all()
+        )
+        
+        # Apply branch filter if specified
+        if branch_id:
+            order_items_query = order_items_query.filter(Order.branchid == branch_id)
+        
+        order_items = order_items_query.all()
         
         # Calculate totals
         total_revenue = sum(payment.amount for payment in payments)
@@ -5241,6 +5256,344 @@ def daily_sales_details(date):
         print(f"Error in daily sales details: {e}")
         flash('An error occurred while loading daily sales details.', 'error')
         return redirect(url_for('sales_report'))
+
+@app.route('/export_daily_sales_pdf/<date>')
+@login_required
+@role_required(['admin'])
+def export_daily_sales_pdf(date):
+    """Export daily sales report as PDF"""
+    try:
+        # Get branch filter from query parameters
+        branch_id = request.args.get('branch_id', type=int)
+        
+        # Convert date string to datetime
+        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        next_day = date_obj + timedelta(days=1)
+        
+        # Get payments for the specific date
+        payments_query = db.session.query(Payment).join(Order).filter(
+            Payment.payment_status == 'completed',
+            Payment.created_at >= date_obj,
+            Payment.created_at < next_day
+        )
+        
+        # Apply branch filter if specified
+        if branch_id:
+            payments_query = payments_query.filter(Order.branchid == branch_id)
+        
+        payments = payments_query.all()
+        
+        # Get order items for the specific date using same logic as sales report
+        order_items_query = db.session.query(OrderItem).select_from(Payment).join(Order, Payment.orderid == Order.id).join(
+            OrderItem, Order.id == OrderItem.orderid
+        ).filter(
+            Payment.payment_status == 'completed',
+            Payment.created_at >= date_obj,
+            Payment.created_at < next_day
+        )
+        
+        # Apply branch filter if specified
+        if branch_id:
+            order_items_query = order_items_query.filter(Order.branchid == branch_id)
+        
+        order_items = order_items_query.all()
+        
+        # Get branch information
+        branch = None
+        if branch_id:
+            branch = Branch.query.get(branch_id)
+        
+        # Calculate totals
+        total_revenue = sum(payment.amount for payment in payments)
+        total_payments = len(payments)
+        total_items = len(order_items)  # Count of items, not sum of quantities
+        
+        # Calculate profit using the same logic as sales report
+        total_profit_query = db.session.query(
+            db.func.sum((OrderItem.final_price - OrderItem.buying_price) * OrderItem.quantity)
+        ).select_from(Payment).join(Order, Payment.orderid == Order.id).join(
+            OrderItem, Order.id == OrderItem.orderid
+        ).filter(
+            Payment.payment_status == 'completed',
+            Payment.created_at >= date_obj,
+            Payment.created_at < next_day,
+            OrderItem.final_price.isnot(None),
+            OrderItem.buying_price.isnot(None)
+        )
+        
+        # Apply branch filter if specified
+        if branch_id:
+            total_profit_query = total_profit_query.filter(Order.branchid == branch_id)
+        
+        total_profit = total_profit_query.scalar() or 0.0
+        
+        # Create PDF buffer
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=18)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            alignment=1,  # Center alignment
+            textColor=colors.HexColor('#2c3e50')
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            spaceAfter=20,
+            textColor=colors.HexColor('#34495e')
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=12
+        )
+        
+        # Load the logo image
+        try:
+            logo_path = os.path.join(app.static_folder, 'assets', 'img', 'logo.png')
+            print(f"Loading logo from: {logo_path}")
+            logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
+            logo_cell = logo_image
+        except Exception as e:
+            print(f"Error loading logo: {e}")
+            # Create a placeholder if logo fails to load
+            logo_cell = Paragraph('''
+            <para align=left>
+            <b><font size=18 color="#1a365d">ABZ HARDWARE LIMITED</font></b>
+            </para>
+            ''', normal_style)
+        
+        # Create the letterhead table for proper layout
+        letterhead_data = [
+            [logo_cell, Paragraph('''
+            <para align=right>
+            <b><font size=18 color="#1a365d">ABZ HARDWARE LIMITED</font></b><br/>
+            <font size=12 color="#4a5568">Your Trusted Hardware Partner</font>
+            </para>
+            ''', normal_style)]
+        ]
+        
+        letterhead_table = Table(letterhead_data, colWidths=[2*inch, 4*inch])
+        letterhead_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        
+        elements.append(letterhead_table)
+        elements.append(Spacer(1, 20))
+        
+        # Title
+        elements.append(Paragraph("DAILY SALES REPORT", title_style))
+        elements.append(Spacer(1, 30))
+        
+        # Report details
+        if branch:
+            report_details = f"""
+            <b>Date:</b> {date_obj.strftime('%A, %B %d, %Y')}<br/>
+            <b>Branch:</b> {branch.name}<br/>
+            <b>Location:</b> {branch.location}<br/>
+            <b>Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"""
+        else:
+            report_details = f"""
+            <b>Date:</b> {date_obj.strftime('%A, %B %d, %Y')}<br/>
+            <b>Branch:</b> All Branches<br/>
+            <b>Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"""
+        
+        elements.append(Paragraph(report_details, normal_style))
+        elements.append(Spacer(1, 30))
+        
+        # Helper function to format numbers without unnecessary decimals
+        def format_number(value):
+            if value == int(value):
+                return f"{int(value):,}"
+            else:
+                return f"{value:,.2f}"
+        
+        # Summary section
+        elements.append(Paragraph("SUMMARY", heading_style))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Revenue', f'KSh {format_number(total_revenue)}'],
+            ['Total Payments', str(total_payments)],
+            ['Total Items Sold', str(total_items)],
+            ['Total Profit', f'KSh {format_number(total_profit)}']
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
+        summary_table.setStyle(TableStyle([
+            # Header styling
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            
+            # Data styling
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Metric names left
+            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),   # Values right
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 11),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+            ('LEFTPADDING', (0, 1), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 1), (-1, -1), 8),
+            
+            # Grid
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        
+        elements.append(summary_table)
+        elements.append(Spacer(1, 30))
+        
+        # Payments section
+        if payments:
+            elements.append(Paragraph("PAYMENT DETAILS", heading_style))
+            
+            payment_data = [['Payment ID', 'Order ID', 'Amount', 'Method', 'Status', 'Time']]
+            
+            for payment in payments:
+                payment_data.append([
+                    str(payment.id),
+                    str(payment.orderid),
+                    f'KSh {format_number(payment.amount)}',
+                    payment.payment_method or 'N/A',
+                    payment.payment_status or 'N/A',
+                    payment.created_at.strftime('%H:%M') if payment.created_at else 'N/A'
+                ])
+            
+            payment_table = Table(payment_data, colWidths=[0.8*inch, 0.8*inch, 1.2*inch, 1*inch, 1*inch, 0.8*inch])
+            payment_table.setStyle(TableStyle([
+                # Header styling
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                
+                # Data styling
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+                ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                ('LEFTPADDING', (0, 1), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 1), (-1, -1), 4),
+                
+                # Grid
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            
+            elements.append(payment_table)
+            elements.append(Spacer(1, 30))
+        
+        # Order items section
+        if order_items:
+            elements.append(Paragraph("SOLD ITEMS", heading_style))
+            
+            items_data = [['Product', 'Quantity', 'Unit Price', 'Total', 'Profit']]
+            
+            for item in order_items:
+                product_name = 'N/A'
+                if item.branch_product and item.branch_product.catalog_product:
+                    product_name = item.branch_product.catalog_product.name
+                elif item.product_name:
+                    product_name = item.product_name
+                
+                unit_price = item.final_price or 0
+                total_price = unit_price * item.quantity
+                profit = (item.final_price - item.buying_price) * item.quantity if item.final_price and item.buying_price else 0
+                
+                # Format quantity without unnecessary decimals
+                quantity_value = float(item.quantity)
+                if quantity_value.is_integer():
+                    quantity_str = str(int(quantity_value))
+                else:
+                    quantity_str = str(quantity_value)
+                
+                items_data.append([
+                    product_name[:30] + '...' if len(product_name) > 30 else product_name,
+                    quantity_str,
+                    f'KSh {format_number(unit_price)}',
+                    f'KSh {format_number(total_price)}',
+                    f'KSh {format_number(profit)}'
+                ])
+            
+            items_table = Table(items_data, colWidths=[2.5*inch, 0.8*inch, 1*inch, 1*inch, 1*inch])
+            items_table.setStyle(TableStyle([
+                # Header styling
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                
+                # Data styling
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+                ('ALIGN', (1, 1), (-1, -1), 'CENTER'),  # All except product name
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),     # Product name left
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                ('LEFTPADDING', (0, 1), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 1), (-1, -1), 4),
+                
+                # Grid
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            
+            elements.append(items_table)
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF content
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        # Create response
+        response = make_response(pdf_content)
+        response.headers['Content-Type'] = 'application/pdf'
+        
+        # Create filename with branch information
+        if branch:
+            branch_name = branch.name.lower().replace(' ', '_')
+            filename = f"daily_sales_report_{branch_name}_{date_obj.strftime('%Y-%m-%d')}.pdf"
+        else:
+            filename = f"daily_sales_report_all_branches_{date_obj.strftime('%Y-%m-%d')}.pdf"
+        
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error exporting daily sales report to PDF: {e}")
+        flash('An error occurred while exporting daily sales report to PDF.', 'error')
+        return redirect(url_for('daily_sales_details', date=date))
 
 @app.route('/delete_payment', methods=['POST'])
 @login_required
