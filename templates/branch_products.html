@@ -222,6 +222,17 @@
   }
 }
 
+/* Button Styling */
+.btn-success {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.btn-success:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .custom-modal-content {
@@ -279,8 +290,11 @@
         <a href="{{ url_for('products') }}" class="btn btn-secondary btn-round">
           <i class="fas fa-arrow-left"></i> All Products
         </a>
-        <button class="btn btn-primary btn-round ms-2" onclick="openAddProductModal()">
-          Add Product to Branch
+        <button class="btn btn-primary btn-round ms-2" onclick="openAddExistingProductModal()">
+          <i class="fas fa-list"></i> Add Existing Product
+        </button>
+        <button class="btn btn-success btn-round ms-2" onclick="openAddNewProductModal()">
+          <i class="fas fa-plus"></i> Add New Product
         </button>
       </div>
     </div>
@@ -514,13 +528,13 @@
   </div>
 </div>
 
-<!-- Custom Add Branch Product Modal -->
-<div id="addBranchProductModal" class="custom-modal" style="display: none;">
-  <div class="custom-modal-overlay" onclick="closeModal('addBranchProductModal')"></div>
+<!-- Add Existing Product Modal -->
+<div id="addExistingProductModal" class="custom-modal" style="display: none;">
+  <div class="custom-modal-overlay" onclick="closeModal('addExistingProductModal')"></div>
   <div class="custom-modal-content custom-modal-lg">
     <div class="custom-modal-header">
-      <h5 class="custom-modal-title">Add Product to Branch</h5>
-      <button type="button" class="custom-modal-close" onclick="closeModal('addBranchProductModal')">&times;</button>
+      <h5 class="custom-modal-title"><i class="fas fa-list"></i> Add Existing Product to Branch</h5>
+      <button type="button" class="custom-modal-close" onclick="closeModal('addExistingProductModal')">&times;</button>
     </div>
     <form action="{{ url_for('add_branch_product') }}" method="POST">
       <div class="custom-modal-body">
@@ -531,7 +545,7 @@
               <select class="form-control" id="catalog_id" name="catalog_id" required>
                 <option value="">Select Product</option>
               </select>
-              <small class="form-text text-muted">Search for products to add to this branch</small>
+              <small class="form-text text-muted">Choose from existing products in the catalog</small>
             </div>
           </div>
           <div class="col-md-6">
@@ -578,8 +592,101 @@
         </div>
       </div>
       <div class="custom-modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('addBranchProductModal')">Cancel</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addExistingProductModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Add to Branch</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add New Product Modal -->
+<div id="addNewProductModal" class="custom-modal" style="display: none;">
+  <div class="custom-modal-overlay" onclick="closeModal('addNewProductModal')"></div>
+  <div class="custom-modal-content custom-modal-lg">
+    <div class="custom-modal-header">
+      <h5 class="custom-modal-title"><i class="fas fa-plus"></i> Add New Product to Branch</h5>
+      <button type="button" class="custom-modal-close" onclick="closeModal('addNewProductModal')">&times;</button>
+    </div>
+    <form action="{{ url_for('add_new_product_to_branch') }}" method="POST" enctype="multipart/form-data">
+      <div class="custom-modal-body">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="productName">Product Name *</label>
+              <input type="text" class="form-control" id="productName" name="name" required>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="productCode">Product Code</label>
+              <input type="text" class="form-control" id="productCode" name="productcode">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="productSubcategory">Subcategory</label>
+              <select class="form-control" id="productSubcategory" name="subcategory_id">
+                <option value="">No subcategory</option>
+                {% for subcategory in subcategories %}
+                <option value="{{ subcategory.id }}">{{ subcategory.name }} ({{ subcategory.category.name }})</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="productImage">Product Image</label>
+              <input type="file" class="form-control" id="productImage" name="image" accept="image/*">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="form-group">
+              <label for="newBuyingprice">Buying Price</label>
+              <input type="number" class="form-control" id="newBuyingprice" name="buyingprice" min="0" step="0.01">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-group">
+              <label for="newSellingprice">Selling Price</label>
+              <input type="number" class="form-control" id="newSellingprice" name="sellingprice" min="0" step="0.01">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-group">
+              <label for="newStock">Initial Stock</label>
+              <input type="number" class="form-control" id="newStock" name="stock" min="0" value="0">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="newDisplay">Display Status</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="newDisplay" name="display" checked>
+                <label class="form-check-label" for="newDisplay">
+                  Visible to customers
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="newBranchid">Branch *</label>
+              <select class="form-control" id="newBranchid" name="branchid" required>
+                <option value="{{ branch.id }}" selected>{{ branch.name }} - {{ branch.location }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addNewProductModal')">Cancel</button>
+        <button type="submit" class="btn btn-success">Create & Add to Branch</button>
       </div>
     </form>
   </div>
@@ -720,9 +827,13 @@ function closeModal(modalId) {
     document.body.style.overflow = 'auto'; // Restore scrolling
 }
 
-function openAddProductModal() {
+function openAddExistingProductModal() {
     loadCatalogProducts();
-    openModal('addBranchProductModal');
+    openModal('addExistingProductModal');
+}
+
+function openAddNewProductModal() {
+    openModal('addNewProductModal');
 }
 
 function addStock(branchProductId) {

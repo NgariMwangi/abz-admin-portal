@@ -1697,6 +1697,107 @@ def add_branch_product():
     flash('ProductCatalog added to branch successfully', 'success')
     return redirect(url_for('branch_products', branch_id=branchid))
 
+@app.route('/add_new_product_to_branch', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def add_new_product_to_branch():
+    """Add a new product to catalog and then add it to the specified branch"""
+    try:
+        # Get form data
+        name = request.form.get('name', '').strip()
+        productcode = request.form.get('productcode', '').strip()
+        subcategory_id = request.form.get('subcategory_id')
+        buyingprice = request.form.get('buyingprice')
+        sellingprice = request.form.get('sellingprice')
+        stock = request.form.get('stock')
+        display = request.form.get('display') == 'on'
+        branchid = request.form.get('branchid')
+        image = request.files.get('image')
+        
+        # Basic validation
+        if not name or not branchid:
+            flash('Product name and branch are required', 'error')
+            return redirect(url_for('products', branch_id=branchid))
+        
+        # Check if product with same name and code already exists
+        existing_product = ProductCatalog.query.filter(
+            ProductCatalog.name == name,
+            ProductCatalog.productcode == productcode
+        ).first()
+        
+        if existing_product:
+            flash('A product with this name and code already exists in the catalog', 'error')
+            return redirect(url_for('products', branch_id=branchid))
+        
+        # Handle image upload to Cloudinary
+        image_url = None
+        if image and image.filename:
+            try:
+                # Upload to Cloudinary
+                image_url = upload_to_cloudinary(image)
+                print(f"Image uploaded successfully: {image_url}")
+            except Exception as e:
+                print(f"Error uploading image to Cloudinary: {e}")
+                image_url = None
+        
+        # Convert empty strings to None
+        subcategory_id = int(subcategory_id) if subcategory_id else None
+        buyingprice = float(buyingprice) if buyingprice else None
+        sellingprice = float(sellingprice) if sellingprice else None
+        
+        # Handle stock conversion properly - convert decimal to int
+        if stock:
+            try:
+                stock = int(float(stock))
+            except (ValueError, TypeError):
+                stock = 0
+        else:
+            stock = 0
+        
+        # Create new product in catalog
+        new_catalog_product = ProductCatalog(
+            name=name,
+            productcode=productcode if productcode else None,
+            subcategory_id=subcategory_id,
+            image_url=image_url
+        )
+        
+        db.session.add(new_catalog_product)
+        db.session.flush()  # Get the ID without committing
+        
+        # Check if branch product already exists for this catalog product and branch
+        existing_branch_product = BranchProduct.query.filter_by(
+            catalog_id=new_catalog_product.id, 
+            branchid=branchid
+        ).first()
+        
+        if existing_branch_product:
+            flash('This product already exists in this branch. Please edit the existing entry instead.', 'error')
+            db.session.rollback()
+            return redirect(url_for('products', branch_id=branchid))
+        
+        # Create new branch product
+        new_branch_product = BranchProduct(
+            catalog_id=new_catalog_product.id,
+            branchid=branchid,
+            buyingprice=buyingprice,
+            sellingprice=sellingprice,
+            stock=stock,
+            display=display
+        )
+        
+        db.session.add(new_branch_product)
+        db.session.commit()
+        
+        flash('New product created and added to branch successfully!', 'success')
+        return redirect(url_for('products', branch_id=branchid))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error adding new product to branch: {str(e)}")
+        flash('Error adding new product. Please try again.', 'error')
+        return redirect(url_for('products', branch_id=branchid))
+
 @app.route('/edit_branch_product/<int:id>', methods=['POST'])
 @login_required
 @role_required(['admin'])
@@ -1733,8 +1834,15 @@ def delete_branch_product(id):
         branch_product = BranchProduct.query.get_or_404(id)
         branch_id = branch_product.branchid
         
+        print(f"Attempting to delete branch product {id} from branch {branch_id}")
+        
         # Check if branch product has related records
-        if branch_product.order_items or branch_product.stock_transactions:
+        order_items_count = len(branch_product.order_items) if branch_product.order_items else 0
+        stock_transactions_count = len(branch_product.stock_transactions) if branch_product.stock_transactions else 0
+        
+        print(f"Order items: {order_items_count}, Stock transactions: {stock_transactions_count}")
+        
+        if order_items_count > 0 or stock_transactions_count > 0:
             flash('Cannot delete this branch product. It has associated orders or stock transactions.', 'error')
             return redirect(url_for('products', branch_id=branch_id))
         
@@ -1745,10 +1853,12 @@ def delete_branch_product(id):
         return redirect(url_for('products', branch_id=branch_id))
     except IntegrityError as e:
         db.session.rollback()
+        print(f"IntegrityError deleting branch product: {str(e)}")
         flash('Cannot delete this branch product. It has associated orders, stock transactions, or other related records.', 'error')
         return redirect(url_for('products', branch_id=branch_id))
     except Exception as e:
         db.session.rollback()
+        print(f"Error deleting branch product: {str(e)}")
         flash('An error occurred while deleting the branch product. Please try again.', 'error')
         return redirect(url_for('products', branch_id=branch_id))
 
@@ -1776,9 +1886,9 @@ def get_catalog_products_for_branch():
     search = request.args.get('search', '')
     
     # Get catalog products that are not already in this branch
-    existing_catalog_ids = db.session.query(BranchProduct.catalog_id).filter_by(branchid=branch_id).subquery()
+    existing_catalog_ids = db.session.query(BranchProduct.catalog_id).filter_by(branchid=branch_id)
     
-    base_query = ProductCatalog.query.filter(~ProductCatalog.id.in_(existing_catalog_ids))
+    base_query = ProductCatalog.query.filter(~ProductCatalog.id.in_(existing_catalog_ids)).order_by(ProductCatalog.name)
     
     if search:
         base_query = base_query.filter(
@@ -1788,7 +1898,7 @@ def get_catalog_products_for_branch():
             )
         )
     
-    catalog_products = base_query.limit(20).all()
+    catalog_products = base_query.all()
     
     return jsonify([{
         'id': cp.id,
@@ -1933,9 +2043,9 @@ def delete_product(id):
     try:
         product = ProductCatalog.query.get_or_404(id)
         
-        # Check if product has related records
-        if product.order_items or product.stock_transactions:
-            flash('Cannot delete this product. It has associated orders or stock transactions.', 'error')
+        # Check if product has related branch products
+        if product.branch_products:
+            flash('Cannot delete this product. It is being used in one or more branches. Please remove it from all branches first.', 'error')
             return redirect(url_for('products'))
         
         # Delete associated image if exists
@@ -1948,14 +2058,15 @@ def delete_product(id):
         db.session.delete(product)
         db.session.commit()
         
-        flash('ProductCatalog deleted successfully', 'success')
+        flash('Product deleted successfully from catalog', 'success')
         return redirect(url_for('products'))
     except IntegrityError as e:
         db.session.rollback()
-        flash('Cannot delete this product. It has associated orders, stock transactions, or other related records.', 'error')
+        flash('Cannot delete this product. It has associated records that prevent deletion.', 'error')
         return redirect(url_for('products'))
     except Exception as e:
         db.session.rollback()
+        print(f"Error deleting product: {str(e)}")
         flash('An error occurred while deleting the product. Please try again.', 'error')
         return redirect(url_for('products'))
 
