@@ -20,7 +20,7 @@ from werkzeug.utils import secure_filename
 import os
 from config import Config
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import or_, func, and_
+from sqlalchemy import or_, func, and_, case
 from sqlalchemy.orm import joinedload
 
 from extensions import db
@@ -1861,6 +1861,292 @@ def delete_branch_product(id):
         print(f"Error deleting branch product: {str(e)}")
         flash('An error occurred while deleting the branch product. Please try again.', 'error')
         return redirect(url_for('products', branch_id=branch_id))
+
+@app.route('/sales_performance')
+@login_required
+@role_required(['admin'])
+def sales_performance():
+    """Sales performance page showing salespeople's order counts and revenue"""
+    try:
+        # Get date range filters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        branch_id = request.args.get('branch_id', type=int)
+        
+        # Default to last 30 days if no dates provided
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Convert string dates to datetime objects
+        start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
+        end_datetime = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)  # Include full end date
+        
+        # Base query for sales performance - match salesperson orders logic
+        # First get all orders for each user
+        orders_query = db.session.query(
+            User.id,
+            User.firstname,
+            User.lastname,
+            User.email,
+            func.count(Order.id).label('total_orders')
+        ).join(Order, User.id == Order.userid).filter(
+            Order.created_at >= start_datetime,
+            Order.created_at < end_datetime
+        )
+        
+        # Add branch filter if specified
+        if branch_id:
+            orders_query = orders_query.filter(Order.branchid == branch_id)
+        
+        # Group by user to get order counts
+        orders_data = orders_query.group_by(
+            User.id, User.firstname, User.lastname, User.email
+        ).all()
+        
+        # Now get revenue data separately (matching salesperson orders logic)
+        revenue_data = {}
+        for user_data in orders_data:
+            user_id = user_data.id
+            # Calculate revenue from completed payments only (same as salesperson orders)
+            completed_payments_query = db.session.query(func.sum(Payment.amount)).join(
+                Order, Payment.orderid == Order.id
+            ).filter(
+                Order.userid == user_id,
+                Order.created_at >= start_datetime,
+                Order.created_at < end_datetime,
+                Payment.payment_status == 'completed'
+            )
+            
+            # Add branch filter if specified
+            if branch_id:
+                completed_payments_query = completed_payments_query.filter(Order.branchid == branch_id)
+            
+            total_revenue = completed_payments_query.scalar() or 0
+            
+            # Calculate completed orders count (orders that have been approved)
+            completed_orders_query = db.session.query(func.count(Order.id)).filter(
+                Order.userid == user_id,
+                Order.created_at >= start_datetime,
+                Order.created_at < end_datetime,
+                Order.approvalstatus.is_(True)
+            )
+            
+            # Add branch filter if specified
+            if branch_id:
+                completed_orders_query = completed_orders_query.filter(Order.branchid == branch_id)
+            
+            completed_orders = completed_orders_query.scalar() or 0
+            
+            revenue_data[user_id] = {
+                'total_revenue': total_revenue,
+                'completed_orders': completed_orders,
+                'completed_revenue': total_revenue
+            }
+        
+        # Combine the data
+        sales_data = []
+        for order_data in orders_data:
+            user_id = order_data.id
+            revenue_info = revenue_data.get(user_id, {
+                'total_revenue': 0,
+                'completed_orders': 0,
+                'completed_revenue': 0
+            })
+            
+            sales_data.append({
+                'id': user_id,
+                'firstname': order_data.firstname,
+                'lastname': order_data.lastname,
+                'email': order_data.email,
+                'total_orders': order_data.total_orders,
+                'total_revenue': revenue_info['total_revenue'],
+                'completed_orders': revenue_info['completed_orders'],
+                'completed_revenue': revenue_info['completed_revenue']
+            })
+        
+        # Sort by total revenue descending
+        sales_data.sort(key=lambda x: x['total_revenue'], reverse=True)
+        
+        # Get branches for filter dropdown
+        branches = Branch.query.order_by(Branch.name).all()
+        
+        # Calculate summary statistics
+        total_salespeople = len(sales_data)
+        total_orders = sum(item['total_orders'] for item in sales_data)
+        total_revenue = sum(item['total_revenue'] or 0 for item in sales_data)
+        total_completed_orders = sum(item['completed_orders'] for item in sales_data)
+        total_completed_revenue = sum(item['completed_revenue'] or 0 for item in sales_data)
+        
+        return render_template('sales_performance.html',
+                             sales_data=sales_data,
+                             branches=branches,
+                             selected_branch_id=branch_id,
+                             start_date=start_date,
+                             end_date=end_date,
+                             total_salespeople=total_salespeople,
+                             total_orders=total_orders,
+                             total_revenue=total_revenue,
+                             total_completed_orders=total_completed_orders,
+                             total_completed_revenue=total_completed_revenue)
+        
+    except Exception as e:
+        print(f"Error loading sales performance: {str(e)}")
+        flash('Error loading sales performance data. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/salesperson_orders/<int:user_id>')
+@login_required
+@role_required(['admin'])
+def salesperson_orders(user_id):
+    """Show detailed orders for a specific salesperson"""
+    try:
+        # Get date range filters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        branch_id = request.args.get('branch_id', type=int)
+        
+        # Default to last 30 days if no dates provided
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Convert string dates to datetime objects
+        start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
+        end_datetime = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)  # Include full end date
+        
+        # Get salesperson info
+        salesperson = User.query.get(user_id)
+        if not salesperson:
+            flash('Salesperson not found.', 'error')
+            return redirect(url_for('sales_performance'))
+        
+        # Get orders for this salesperson with date filter
+        orders_query = Order.query.filter(
+            Order.userid == user_id,
+            Order.created_at >= start_datetime,
+            Order.created_at < end_datetime
+        )
+        
+        # Add branch filter if specified
+        if branch_id:
+            orders_query = orders_query.filter(Order.branchid == branch_id)
+        
+        orders = orders_query.order_by(Order.created_at.desc()).all()
+        
+        # Calculate totals using the same logic as sales performance
+        # Total orders count (all orders regardless of payment status) - use SQL COUNT like sales performance
+        total_orders_count_query = db.session.query(func.count(Order.id)).filter(
+            Order.userid == user_id,
+            Order.created_at >= start_datetime,
+            Order.created_at < end_datetime
+        )
+        
+        # Add branch filter if specified
+        if branch_id:
+            total_orders_count_query = total_orders_count_query.filter(Order.branchid == branch_id)
+        
+        total_orders_count = total_orders_count_query.scalar() or 0
+        
+        # Total revenue from completed payments only (matching sales performance logic)
+        completed_payments_query = db.session.query(func.sum(Payment.amount)).join(
+            Order, Payment.orderid == Order.id
+        ).filter(
+            Order.userid == user_id,
+            Order.created_at >= start_datetime,
+            Order.created_at < end_datetime,
+            Payment.payment_status == 'completed'
+        )
+        
+        # Add branch filter if specified
+        if branch_id:
+            completed_payments_query = completed_payments_query.filter(Order.branchid == branch_id)
+        
+        total_revenue = completed_payments_query.scalar() or 0
+        
+        # Calculate completed orders count (orders that have been approved)
+        # Debug: Let's check what approvalstatus values exist
+        debug_orders = Order.query.filter(Order.userid == user_id).all()
+        print(f"🔍 Debug: Found {len(debug_orders)} orders for user {user_id}")
+        for order in debug_orders[:5]:  # Show first 5 orders
+            print(f"  Order {order.id}: approvalstatus = {order.approvalstatus} (type: {type(order.approvalstatus)})")
+        
+        completed_orders_query = db.session.query(func.count(Order.id)).filter(
+            Order.userid == user_id,
+            Order.created_at >= start_datetime,
+            Order.created_at < end_datetime,
+            Order.approvalstatus.is_(True)
+        )
+        
+        # Add branch filter if specified
+        if branch_id:
+            completed_orders_query = completed_orders_query.filter(Order.branchid == branch_id)
+        
+        completed_orders_count = completed_orders_query.scalar() or 0
+        print(f"🔍 Debug: Completed orders count = {completed_orders_count}")
+        
+        # Get order items with product details for each order
+        orders_with_items = []
+        total_profit = 0
+        
+        for order in orders:
+            # Get order items with product details
+            order_items = db.session.query(OrderItem, BranchProduct, ProductCatalog).outerjoin(
+                BranchProduct, OrderItem.branch_productid == BranchProduct.id
+            ).outerjoin(
+                ProductCatalog, BranchProduct.catalog_id == ProductCatalog.id
+            ).filter(OrderItem.orderid == order.id).all()
+            
+            # Calculate order totals (for display purposes)
+            order_revenue = sum(item.OrderItem.quantity * item.OrderItem.final_price for item in order_items)
+            order_profit = sum((item.OrderItem.final_price - item.OrderItem.buying_price) * item.OrderItem.quantity 
+                             for item in order_items if item.OrderItem.buying_price and item.OrderItem.final_price)
+            
+            # Get payment info for this order
+            payments = Payment.query.filter(Payment.orderid == order.id).all()
+            payment_status = 'pending'
+            total_paid = 0
+            if payments:
+                completed_payments = [p for p in payments if p.payment_status == 'completed']
+                total_paid = sum(p.amount for p in completed_payments)
+                if total_paid >= order_revenue:
+                    payment_status = 'completed'
+                elif total_paid > 0:
+                    payment_status = 'partially_paid'
+            
+            orders_with_items.append({
+                'order': order,
+                'order_items': order_items,
+                'order_revenue': order_revenue,
+                'order_profit': order_profit,
+                'payment_status': payment_status,
+                'total_paid': total_paid,
+                'payments': payments
+            })
+            
+            total_profit += order_profit
+        
+        # Get branches for filter dropdown
+        branches = Branch.query.order_by(Branch.name).all()
+        
+        return render_template('salesperson_orders.html',
+                             salesperson=salesperson,
+                             orders_with_items=orders_with_items,
+                             branches=branches,
+                             selected_branch_id=branch_id,
+                             start_date=start_date,
+                             end_date=end_date,
+                             total_revenue=total_revenue,
+                             total_profit=total_profit,
+                             total_orders=total_orders_count,
+                             completed_orders=completed_orders_count)
+        
+    except Exception as e:
+        print(f"Error loading salesperson orders: {str(e)}")
+        flash('Error loading salesperson orders. Please try again.', 'error')
+        return redirect(url_for('sales_performance'))
 
 @app.route('/get_branch_product/<int:id>')
 @login_required

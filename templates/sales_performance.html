@@ -1,0 +1,298 @@
+{% extends "navbars.html" %}
+
+{% block content %}
+<style>
+.summary-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.summary-card h3 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.summary-card .value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.performance-table {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.performance-table th {
+    background-color: #f8f9fa;
+    border: none;
+    font-weight: 600;
+    color: #495057;
+    padding: 15px;
+}
+
+.performance-table td {
+    border: none;
+    padding: 15px;
+    vertical-align: middle;
+}
+
+.performance-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-weight: bold;
+    color: white;
+    font-size: 14px;
+}
+
+.rank-1 { background: linear-gradient(135deg, #ffd700, #ffed4e); color: #333; }
+.rank-2 { background: linear-gradient(135deg, #c0c0c0, #e5e5e5); color: #333; }
+.rank-3 { background: linear-gradient(135deg, #cd7f32, #daa520); color: white; }
+.rank-other { background: linear-gradient(135deg, #6c757d, #adb5bd); }
+
+.revenue-amount {
+    font-weight: bold;
+    color: #28a745;
+}
+
+.order-count {
+    background-color: #007bff;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.completion-rate {
+    font-weight: bold;
+}
+
+.completion-high { color: #28a745; }
+.completion-medium { color: #ffc107; }
+.completion-low { color: #dc3545; }
+
+.filter-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.no-data {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+</style>
+
+<div class="container">
+    <div class="page-inner">
+        <!-- Header -->
+        <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
+            <div>
+                <h3 class="fw-bold mb-3">Sales Performance</h3>
+                <h6 class="op-7 mb-2">Track salespeople performance by orders and revenue</h6>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h3>Total Salespeople</h3>
+                    <div class="value">{{ total_salespeople }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h3>Total Orders</h3>
+                    <div class="value">{{ total_orders }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h3>Total Revenue</h3>
+                    <div class="value">KSh {{ "{:,.0f}".format(total_revenue) }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h3>Completed Orders</h3>
+                    <div class="value">{{ total_completed_orders }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-section">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="branch_id" class="form-label">Branch</label>
+                    <select class="form-control" id="branch_id" name="branch_id">
+                        <option value="">All Branches</option>
+                        {% for branch in branches %}
+                        <option value="{{ branch.id }}" {% if selected_branch_id == branch.id %}selected{% endif %}>
+                            {{ branch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <a href="{{ url_for('sales_performance') }}" class="btn btn-secondary">Reset</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Performance Table -->
+        <div class="performance-table">
+            {% if sales_data %}
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Salesperson</th>
+                        <th>Total Orders</th>
+                        <th>Completed Orders</th>
+                        <th>Total Revenue</th>
+                        <th>Completed Revenue</th>
+                        <th>Completion Rate</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for salesperson in sales_data %}
+                    <tr>
+                        <td>
+                            {% set rank = loop.index %}
+                            {% if rank == 1 %}
+                                <span class="rank-badge rank-1">1</span>
+                            {% elif rank == 2 %}
+                                <span class="rank-badge rank-2">2</span>
+                            {% elif rank == 3 %}
+                                <span class="rank-badge rank-3">3</span>
+                            {% else %}
+                                <span class="rank-badge rank-other">{{ rank }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>
+                                <strong>{{ salesperson['firstname'] }} {{ salesperson['lastname'] }}</strong>
+                                <br>
+                                <small class="text-muted">{{ salesperson['email'] }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="order-count">{{ salesperson['total_orders'] }}</span>
+                        </td>
+                        <td>
+                            <span class="order-count">{{ salesperson['completed_orders'] }}</span>
+                        </td>
+                        <td>
+                            <span class="revenue-amount">KSh {{ "{:,.0f}".format(salesperson['total_revenue'] or 0) }}</span>
+                        </td>
+                        <td>
+                            <span class="revenue-amount">KSh {{ "{:,.0f}".format(salesperson['completed_revenue'] or 0) }}</span>
+                        </td>
+                        <td>
+                            {% set completion_rate = ((salesperson['completed_orders'] / salesperson['total_orders']) * 100) if salesperson['total_orders'] > 0 else 0 %}
+                            <span class="completion-rate {% if completion_rate >= 80 %}completion-high{% elif completion_rate >= 60 %}completion-medium{% else %}completion-low{% endif %}">
+                                {{ "%.1f"|format(completion_rate) }}%
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('salesperson_orders', user_id=salesperson['id'], start_date=start_date, end_date=end_date, branch_id=selected_branch_id) }}" 
+                               class="btn btn-sm btn-outline-primary" title="View Orders">
+                                <i class="fas fa-eye me-1"></i>View Orders
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-data">
+                <i class="fas fa-chart-line fa-3x mb-3"></i>
+                <h4>No Sales Data Found</h4>
+                <p>No sales data found for the selected date range and filters.</p>
+                <a href="{{ url_for('sales_performance') }}" class="btn btn-primary">Reset Filters</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Date Range Info -->
+        <div class="text-center text-muted mt-3">
+            <small>
+                Showing data from {{ start_date }} to {{ end_date }}
+                {% if selected_branch_id %}
+                    for {{ branches|selectattr('id', 'equalto', selected_branch_id)|map(attribute='name')|first }}
+                {% else %}
+                    for all branches
+                {% endif %}
+            </small>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-submit form when dates change
+document.addEventListener('DOMContentLoaded', function() {
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
+    const branchSelect = document.getElementById('branch_id');
+    
+    // Validate date range
+    function validateDates() {
+        if (startDate.value && endDate.value) {
+            if (new Date(startDate.value) > new Date(endDate.value)) {
+                alert('Start date cannot be after end date');
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    startDate.addEventListener('change', function() {
+        if (validateDates()) {
+            this.form.submit();
+        }
+    });
+    
+    endDate.addEventListener('change', function() {
+        if (validateDates()) {
+            this.form.submit();
+        }
+    });
+    
+    branchSelect.addEventListener('change', function() {
+        this.form.submit();
+    });
+});
+</script>
+
+{% endblock %}

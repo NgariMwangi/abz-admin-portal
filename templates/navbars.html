@@ -295,6 +295,12 @@
                 </ul>
               </div>
             </li>
+            <li class="nav-item {% if request.endpoint == 'sales_performance' %}active{% endif %}">
+              <a href="{{ url_for('sales_performance') }}">
+                <i class="fas fa-users"></i>
+                <p>Sales Performance</p>
+              </a>
+            </li>
           </ul>
         </div>
       </div>
