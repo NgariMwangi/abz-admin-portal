@@ -5,11 +5,21 @@
   <div class="page-inner">
     <div class="d-flex align-items-left align-items-md-center flex-column flex-md-row pt-2 pb-4">
       <div>
-        <h3 class="fw-bold mb-3">Stock History</h3>
-        <h6 class="op-7 mb-2">Transaction history for {{ product.name }}</h6>
+        <h3 class="fw-bold mb-3">Stock Transaction History</h3>
+        <h6 class="op-7 mb-2">
+          Transaction history for 
+          {% if branch_product.catalog_product %}
+            {{ branch_product.catalog_product.name }}
+          {% else %}
+            Unknown Product
+          {% endif %}
+        </h6>
       </div>
       <div class="ms-md-auto py-2 py-md-0">
-        <a href="{{ url_for('products') }}" class="btn btn-secondary btn-round">
+        <a href="{{ url_for('export_stock_history_pdf', branch_product_id=branch_product.id) }}" class="btn btn-primary btn-round me-2">
+          <i class="fas fa-file-pdf"></i> Export PDF
+        </a>
+        <a href="{{ url_for('branch_products', branch_id=branch_product.branchid) }}" class="btn btn-secondary btn-round">
           <i class="fas fa-arrow-left"></i> Back to Products
         </a>
       </div>
@@ -24,21 +34,39 @@
           </div>
           <div class="card-body">
             <div class="row">
-              <div class="col-md-3">
+              <div class="col-md-2">
                 <strong>Product Name:</strong><br>
-                {{ product.name }}
+                {% if branch_product.catalog_product %}
+                  {{ branch_product.catalog_product.name }}
+                {% else %}
+                  Unknown Product
+                {% endif %}
               </div>
-              <div class="col-md-3">
+              <div class="col-md-2">
+                <strong>Branch:</strong><br>
+                {{ branch_product.branch.name }}
+              </div>
+              <div class="col-md-2">
                 <strong>Category:</strong><br>
-                {{ product.category.name }}
+                {% if branch_product.catalog_product and branch_product.catalog_product.subcategory %}
+                  {{ branch_product.catalog_product.subcategory.category.name }}
+                {% else %}
+                  N/A
+                {% endif %}
               </div>
-              <div class="col-md-3">
+              <div class="col-md-2">
                 <strong>Current Stock:</strong><br>
-                <span class="badge bg-primary">{{ product.stock | format_stock }}</span>
+                <span class="badge {% if branch_product.stock > 10 %}badge-success{% elif branch_product.stock > 0 %}badge-warning{% else %}badge-danger{% endif %}">
+                  {{ branch_product.stock | format_stock }}
+                </span>
               </div>
-              <div class="col-md-3">
-                <strong>Product Code:</strong><br>
-                {{ product.productcode or 'N/A' }}
+              <div class="col-md-2">
+                <strong>Buying Price:</strong><br>
+                KSh {{ "{:,.0f}".format(branch_product.buyingprice or 0) }}
+              </div>
+              <div class="col-md-2">
+                <strong>Selling Price:</strong><br>
+                KSh {{ "{:,.0f}".format(branch_product.sellingprice or 0) }}
               </div>
             </div>
           </div>
@@ -88,13 +116,29 @@
                     </td>
                     <td>
                       {% if transaction.transaction_type == 'add' %}
-                        <span class="text-success">+{{ transaction.quantity | format_quantity }}</span>
+                        <span class="text-success">
+                          +{% if transaction.quantity == transaction.quantity|int %}{{ transaction.quantity|int }}{% else %}{{ transaction.quantity }}{% endif %}
+                        </span>
                       {% else %}
-                        <span class="text-danger">-{{ transaction.quantity | format_quantity }}</span>
+                        <span class="text-danger">
+                          -{% if transaction.quantity == transaction.quantity|int %}{{ transaction.quantity|int }}{% else %}{{ transaction.quantity }}{% endif %}
+                        </span>
                       {% endif %}
                     </td>
-                    <td>{{ transaction.previous_stock }}</td>
-                    <td>{{ transaction.new_stock }}</td>
+                    <td>
+                      {% if transaction.previous_stock == transaction.previous_stock|int %}
+                        {{ transaction.previous_stock|int }}
+                      {% else %}
+                        {{ transaction.previous_stock }}
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if transaction.new_stock == transaction.new_stock|int %}
+                        {{ transaction.new_stock|int }}
+                      {% else %}
+                        {{ transaction.new_stock }}
+                      {% endif %}
+                    </td>
                     <td>{{ transaction.user.firstname }} {{ transaction.user.lastname }}</td>
                     <td>{{ transaction.notes or 'No notes' }}</td>
                   </tr>

@@ -342,24 +342,40 @@ def index():
         recent_orders_list = []
         recent_users = []
     
-    # Branch statistics
+    # Branch statistics with product asset value
     branch_stats = []
     try:
         for branch in Branch.query.all():
             try:
                 branch_products = BranchProduct.query.filter_by(branchid=branch.id).count()
                 branch_orders = Order.query.filter_by(branchid=branch.id).count()
+                
+                # Calculate product asset value for this branch (buying price * stock)
+                branch_asset_value = db.session.query(
+                    func.sum(BranchProduct.buyingprice * BranchProduct.stock)
+                ).filter(
+                    and_(
+                        BranchProduct.branchid == branch.id,
+                        BranchProduct.buyingprice.isnot(None),
+                        BranchProduct.buyingprice > 0,
+                        BranchProduct.stock.isnot(None),
+                        BranchProduct.stock > 0
+                    )
+                ).scalar() or 0
+                
                 branch_stats.append({
                     'branch': branch,
                     'products': branch_products,
-                    'orders': branch_orders
+                    'orders': branch_orders,
+                    'asset_value': branch_asset_value
                 })
             except Exception as e:
                 print(f"Error getting stats for branch {branch.id}: {e}")
                 branch_stats.append({
                     'branch': branch,
                     'products': 0,
-                    'orders': 0
+                    'orders': 0,
+                    'asset_value': 0
                 })
     except Exception as e:
         print(f"Error getting branch statistics: {e}")
@@ -2455,6 +2471,201 @@ def stock_history(branch_product_id):
         transaction.created_at_adjusted = transaction.created_at + timedelta(hours=3)
     
     return render_template('stock_history.html', branch_product=branch_product, transactions=transactions)
+
+@app.route('/export_stock_history_pdf/<int:branch_product_id>')
+@login_required
+@role_required(['admin'])
+def export_stock_history_pdf(branch_product_id):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from io import BytesIO
+    
+    # Get branch product and transactions
+    branch_product = BranchProduct.query.get_or_404(branch_product_id)
+    transactions = StockTransaction.query.filter_by(branch_productid=branch_product_id).order_by(StockTransaction.created_at.desc()).all()
+    
+    # Helper function to format numbers
+    def format_number(value):
+        if value is None:
+            return "0"
+        # Convert to float to handle Decimal types
+        num = float(value)
+        # Check if it's a whole number
+        if num == int(num):
+            return str(int(num))
+        return str(num)
+    
+    # Create PDF buffer
+    buffer = BytesIO()
+    
+    # Get product name for filename
+    product_name = branch_product.catalog_product.name if branch_product.catalog_product else 'Unknown'
+    branch_name = branch_product.branch.name if branch_product.branch else 'Unknown'
+    
+    # Create PDF document in landscape mode for better table display
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=100,
+        bottomMargin=30
+    )
+    
+    # Container for PDF elements
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#1572e8'),
+        spaceAfter=30,
+        alignment=TA_CENTER
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#1572e8'),
+        spaceAfter=12,
+        alignment=TA_LEFT
+    )
+    
+    # Add title
+    title = Paragraph("Stock Transaction History", title_style)
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+    
+    # Product information section
+    product_info_data = [
+        ['Product Name:', product_name, 'Branch:', branch_name],
+        ['Current Stock:', format_number(branch_product.stock), 
+         'Buying Price:', f"KSh {format_number(branch_product.buyingprice or 0)}"],
+        ['Product Code:', branch_product.catalog_product.productcode if branch_product.catalog_product and branch_product.catalog_product.productcode else 'N/A', 
+         'Selling Price:', f"KSh {format_number(branch_product.sellingprice or 0)}"]
+    ]
+    
+    product_info_table = Table(product_info_data, colWidths=[1.5*inch, 3*inch, 1.5*inch, 3*inch])
+    product_info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+        ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#f0f0f0')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    
+    elements.append(product_info_table)
+    elements.append(Spacer(1, 20))
+    
+    # Transactions section
+    if transactions:
+        # Transaction table header
+        transaction_data = [['Date & Time', 'Type', 'Quantity', 'Previous Stock', 'New Stock', 'User', 'Notes']]
+        
+        # Add transaction rows
+        for transaction in transactions:
+            # Adjust time (3 hours ahead)
+            adjusted_time = transaction.created_at + timedelta(hours=3)
+            date_time = adjusted_time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Format transaction type
+            trans_type = 'Add' if transaction.transaction_type == 'add' else 'Remove'
+            
+            # Format quantity with +/- sign
+            if transaction.transaction_type == 'add':
+                quantity = f"+{format_number(transaction.quantity)}"
+            else:
+                quantity = f"-{format_number(transaction.quantity)}"
+            
+            # Get user name
+            user_name = f"{transaction.user.firstname} {transaction.user.lastname}" if transaction.user else 'Unknown'
+            
+            # Notes
+            notes = transaction.notes or 'No notes'
+            
+            transaction_data.append([
+                date_time,
+                trans_type,
+                quantity,
+                format_number(transaction.previous_stock),
+                format_number(transaction.new_stock),
+                user_name,
+                notes[:30] + '...' if len(notes) > 30 else notes  # Truncate long notes
+            ])
+        
+        # Create transaction table
+        transaction_table = Table(transaction_data, colWidths=[1.5*inch, 0.8*inch, 1*inch, 1.2*inch, 1*inch, 1.5*inch, 2*inch])
+        transaction_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1572e8')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        # Add alternating row colors
+        for i in range(1, len(transaction_data)):
+            if i % 2 == 0:
+                transaction_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f0f0f0'))
+                ]))
+        
+        elements.append(transaction_table)
+    else:
+        # No transactions message
+        no_data_style = ParagraphStyle(
+            'NoData',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.grey,
+            alignment=TA_CENTER
+        )
+        no_data = Paragraph("No stock transactions found for this product.", no_data_style)
+        elements.append(no_data)
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Get PDF data
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    
+    # Create response with proper filename
+    safe_product_name = ''.join(c for c in product_name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_branch_name = ''.join(c for c in branch_name if c.isalnum() or c in (' ', '-', '_')).strip()
+    filename = f"Stock_History_{safe_product_name}_{safe_branch_name}.pdf"
+    
+    response = make_response(pdf_data)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
 
 @app.route('/toggle_display/<int:branch_product_id>', methods=['POST'])
 @login_required

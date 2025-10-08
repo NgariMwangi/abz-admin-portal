@@ -528,6 +528,91 @@
       </div>
     </div>
     
+    <!-- Branch Product Assets Section -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card card-round">
+          <div class="card-header">
+            <div class="card-head-row">
+              <div class="card-title"><i class="fas fa-building me-2"></i>Branch Product Assets</div>
+              <div class="card-tools">
+                <span class="badge bg-info">{{ total_branches }} Branches</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              {% if branch_stats %}
+                {% for stat in branch_stats %}
+                <div class="col-sm-6 col-md-4 col-lg-3 mb-3">
+                  <div class="card card-stats card-round h-100 d-flex flex-column">
+                    <div class="card-body d-flex flex-column flex-grow-1">
+                      <!-- Branch Header -->
+                      <div class="d-flex align-items-center mb-3">
+                        <div class="avatar avatar-md me-3">
+                          <span class="avatar-title rounded-circle bg-gradient-primary">
+                            <i class="fas fa-store-alt text-white"></i>
+                          </span>
+                        </div>
+                        <div class="flex-grow-1">
+                          <h5 class="fw-bold mb-0 text-dark">{{ stat.branch.name }}</h5>
+                          <small class="text-muted d-block" style="font-size: 0.75rem;">
+                            <i class="fas fa-map-marker-alt me-1"></i>{{ stat.branch.location }}
+                          </small>
+                        </div>
+                      </div>
+                      
+                      <!-- Asset Value Highlight -->
+                      <div class="text-center py-3 bg-light rounded mb-3">
+                        <small class="text-muted d-block mb-1">Total Asset Value</small>
+                        <h3 class="mb-0 fw-bold" style="color: #1572e8;">
+                          KSh {{ "{:,.0f}".format(stat.asset_value) }}
+                        </h3>
+                      </div>
+                      
+                      <!-- Stats Row -->
+                      <div class="row text-center mb-3">
+                        <div class="col-6">
+                          <div class="p-2 bg-light rounded">
+                            <i class="fas fa-box text-primary mb-1"></i>
+                            <h6 class="mb-0 fw-bold">{{ stat.products }}</h6>
+                            <small class="text-muted" style="font-size: 0.7rem;">Products</small>
+                          </div>
+                        </div>
+                        <div class="col-6">
+                          <div class="p-2 bg-light rounded">
+                            <i class="fas fa-shopping-cart text-success mb-1"></i>
+                            <h6 class="mb-0 fw-bold">{{ stat.orders }}</h6>
+                            <small class="text-muted" style="font-size: 0.7rem;">Orders</small>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Spacer to push button to bottom -->
+                      <div class="mt-auto">
+                        <a href="{{ url_for('branch_products', branch_id=stat.branch.id) }}" 
+                           class="btn btn-primary btn-sm w-100 btn-round">
+                          <i class="fas fa-arrow-right me-2"></i>View Products
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              {% else %}
+                <div class="col-12">
+                  <div class="text-center py-4">
+                    <i class="fas fa-building fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No branches found</p>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- Product Asset Breakdown Summary -->
     <div class="row">
       <div class="col-12">
