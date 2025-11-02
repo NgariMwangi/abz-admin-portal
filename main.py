@@ -3530,14 +3530,13 @@ def branches():
         ).filter(Order.branchid.in_(branch_ids)).group_by(Order.branchid).all()
         order_count_dict = {bid: count for bid, count in order_counts}
         
-        # Get revenue for all branches in one efficient query
+        # Get revenue for all branches using Payment.amount (matching sales_report calculation)
         revenue_data = db.session.query(
             Order.branchid,
-            db.func.sum(OrderItem.quantity * OrderItem.final_price).label('revenue')
-        ).join(OrderItem, Order.id == OrderItem.orderid).filter(
+            db.func.sum(Payment.amount).label('revenue')
+        ).join(Payment, Order.id == Payment.orderid).filter(
             Order.branchid.in_(branch_ids),
-            Order.payment_status.in_(['paid', 'partially_paid']),
-            OrderItem.final_price.isnot(None)
+            Payment.payment_status == 'completed'
         ).group_by(Order.branchid).all()
         revenue_dict = {bid: float(revenue) if revenue else 0.0 for bid, revenue in revenue_data}
         
