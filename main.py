@@ -3132,7 +3132,13 @@ def orders():
 @role_required(['admin'])
 def order_details(order_id):
     try:
-        order = Order.query.get_or_404(order_id)
+        # Eagerly load relationships to avoid N+1 queries
+        order = Order.query.options(
+            db.joinedload(Order.order_items).joinedload(OrderItem.branch_product).joinedload(BranchProduct.catalog_product),
+            db.joinedload(Order.user),
+            db.joinedload(Order.branch),
+            db.joinedload(Order.payments)
+        ).get_or_404(order_id)
         
         # Calculate order total and profit using OrderItem fields directly
         total_amount = 0
@@ -3771,12 +3777,36 @@ def branch_details(branch_id):
         # Get only a limited number of products for display (for performance)
         products = BranchProduct.query.filter_by(branchid=branch_id).limit(20).all()
         
-        # Calculate branch revenue using the same efficient method as branches page
+        # Calculate total branch revenue using Payment.amount (matching sales_report calculation)
         branch_revenue = db.session.query(
-            db.func.sum(OrderItem.quantity * OrderItem.final_price)
-        ).join(Order, OrderItem.orderid == Order.id).filter(
+            db.func.sum(Payment.amount)
+        ).join(Order, Payment.orderid == Order.id).filter(
             Order.branchid == branch_id,
-            Order.payment_status.in_(['paid', 'partially_paid']),
+            Payment.payment_status == 'completed'
+        ).scalar() or 0
+        
+        # Calculate revenue from catalog products (OrderItem with branch_productid)
+        # Using OrderItem amounts to differentiate catalog vs manual products
+        catalog_revenue = db.session.query(
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
+        ).join(Order, OrderItem.orderid == Order.id).join(
+            Payment, Order.id == Payment.orderid
+        ).filter(
+            Order.branchid == branch_id,
+            Payment.payment_status == 'completed',
+            OrderItem.branch_productid.isnot(None),  # Has relationship with BranchProduct
+            OrderItem.final_price.isnot(None)
+        ).scalar() or 0
+        
+        # Calculate revenue from manually added products (OrderItem without branch_productid)
+        manual_revenue = db.session.query(
+            db.func.sum(OrderItem.quantity * OrderItem.final_price)
+        ).join(Order, OrderItem.orderid == Order.id).join(
+            Payment, Order.id == Payment.orderid
+        ).filter(
+            Order.branchid == branch_id,
+            Payment.payment_status == 'completed',
+            OrderItem.branch_productid.is_(None),  # No relationship with BranchProduct (manually added)
             OrderItem.final_price.isnot(None)
         ).scalar() or 0
         
@@ -3786,7 +3816,9 @@ def branch_details(branch_id):
                              total_orders=total_orders,
                              recent_orders=recent_orders,
                              products=products,
-                             branch_revenue=branch_revenue)
+                             branch_revenue=branch_revenue,
+                             catalog_revenue=catalog_revenue,
+                             manual_revenue=manual_revenue)
     except Exception as e:
         print(f"Error in branch details route: {e}")
         flash('An error occurred while loading branch details.', 'error')

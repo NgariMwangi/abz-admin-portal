@@ -199,8 +199,8 @@
                   <tr>
                     <td>
                       <div class="d-flex align-items-center">
-                        {% if item.product and item.product.image_url %}
-                        <img src="{{ item.product.image_url }}" alt="{{ item.product.name }}" class="me-3" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px;">
+                        {% if item.branch_product and item.branch_product.catalog_product and item.branch_product.catalog_product.image_url %}
+                        <img src="{{ item.branch_product.catalog_product.image_url }}" alt="{{ item.branch_product.catalog_product.name }}" class="me-3" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px;">
                         {% else %}
                         <div class="bg-light rounded me-3 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
                           <i class="fas fa-box text-muted"></i>
@@ -208,25 +208,27 @@
                         {% endif %}
                         <div>
                           <div class="fw-bold">
-                            {% if item.product %}
-                              {{ item.product.name }}
+                            {% if item.branch_product and item.branch_product.catalog_product %}
+                              {{ item.branch_product.catalog_product.name }}
                             {% elif item.product_name %}
                               {{ item.product_name }}
                             {% else %}
                               Product Not Found
                             {% endif %}
                           </div>
-                          {% if item.product and item.product.productcode %}
-                          <small class="text-muted">Code: {{ item.product.productcode }}</small>
+                          {% if item.branch_product and item.branch_product.catalog_product and item.branch_product.catalog_product.productcode %}
+                          <small class="text-muted">Code: {{ item.branch_product.catalog_product.productcode }}</small>
+                          {% elif item.branch_productid %}
+                          <small class="text-muted">From Catalog</small>
                           {% elif item.product_name %}
-                          <small class="text-muted">Manual Entry</small>
+                          <small class="text-muted text-warning">Manual Entry</small>
                           {% endif %}
                         </div>
                       </div>
                     </td>
                     <td>
-                      {% if item.product and item.product.category %}
-                      <span class="badge badge-info">{{ item.product.category.name }}</span>
+                      {% if item.branch_product and item.branch_product.catalog_product and item.branch_product.catalog_product.subcategory and item.branch_product.catalog_product.subcategory.category %}
+                      <span class="badge badge-info">{{ item.branch_product.catalog_product.subcategory.category.name }}</span>
                       {% else %}
                       <span class="badge badge-secondary">N/A</span>
                       {% endif %}
@@ -240,27 +242,27 @@
                        {% endif %}
                      </td>
                      <td>
-                       {% if item.product and item.product.buyingprice %}
-                       <span class="text-muted">KSh {{ "%.2f"|format(item.product.buyingprice) }}</span>
-                       {% elif item.buying_price %}
+                       {% if item.buying_price %}
                        <span class="text-muted">KSh {{ "%.2f"|format(item.buying_price) }}</span>
+                       {% elif item.branch_product and item.branch_product.buyingprice %}
+                       <span class="text-muted">KSh {{ "%.2f"|format(item.branch_product.buyingprice) }}</span>
                        {% else %}
                        <span class="text-muted">N/A</span>
                        {% endif %}
                      </td>
                      <td>
                        {% if item.final_price %}
-                         {% if item.product and item.product.buyingprice %}
-                           {% set item_profit = (item.final_price - item.product.buyingprice) * item.quantity %}
-                           <strong class="text-success">KSh {{ "%.2f"|format(item_profit) }}</strong>
-                         {% elif item.buying_price %}
+                         {% if item.buying_price %}
                            {% set item_profit = (item.final_price - item.buying_price) * item.quantity %}
+                           <strong class="text-success">KSh {{ "%.2f"|format(item_profit) }}</strong>
+                         {% elif item.branch_product and item.branch_product.buyingprice %}
+                           {% set item_profit = (item.final_price - item.branch_product.buyingprice) * item.quantity %}
                            <strong class="text-success">KSh {{ "%.2f"|format(item_profit) }}</strong>
                          {% else %}
                            <span class="text-muted">N/A</span>
                          {% endif %}
-                       {% elif item.product and item.product.sellingprice and item.product.buyingprice %}
-                         {% set item_profit = (item.product.sellingprice - item.product.buyingprice) * item.quantity %}
+                       {% elif item.branch_product and item.branch_product.sellingprice and item.branch_product.buyingprice %}
+                         {% set item_profit = (item.branch_product.sellingprice - item.branch_product.buyingprice) * item.quantity %}
                          <strong class="text-success">KSh {{ "%.2f"|format(item_profit) }}</strong>
                        {% else %}
                          <span class="text-muted">N/A</span>
